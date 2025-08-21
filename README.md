@@ -99,3 +99,4 @@ This project follows a structured implementation plan. Please refer to the memor
 ## License
 
 This project is part of an academic dissertation on software visualization tools.
+

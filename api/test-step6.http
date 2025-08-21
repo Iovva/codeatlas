@@ -1,0 +1,61 @@
+### Step 6 Tests: Build + Target Framework (TFM) + Exclude Tests
+
+### Test 1: Multi-target repository (should choose best TFM and build successfully)
+POST http://localhost:5000/analyze
+Content-Type: application/json
+
+{
+  "repoUrl": "https://github.com/dotnet/samples.git"
+}
+
+### Test 2: Repository with test projects (should exclude test files from analysis)
+POST http://localhost:5000/analyze
+Content-Type: application/json
+
+{
+  "repoUrl": "https://github.com/nunit/nunit.git"
+}
+
+### Test 3: Repository requiring specific workload (might trigger MissingSdk error)
+# Note: This test requires running on a machine without required workloads
+POST http://localhost:5000/analyze
+Content-Type: application/json
+
+{
+  "repoUrl": "https://github.com/xamarin/xamarin-forms-samples.git"
+}
+
+### Test 4: Simple repository with standard .NET SDK requirements
+POST http://localhost:5000/analyze
+Content-Type: application/json
+
+{
+  "repoUrl": "https://github.com/dotnet/BenchmarkDotNet.git"
+}
+
+### Test 5: Repository with generated files (should exclude .g.cs, .designer.cs files)
+POST http://localhost:5000/analyze
+Content-Type: application/json
+
+{
+  "repoUrl": "https://github.com/aspnet/MusicStore.git"
+}
+
+### Expected Results:
+# Test 1: HTTP 200, compilation successful, TFM selection logged
+# Test 2: HTTP 200, test projects excluded from analysis (check logs)
+# Test 3: HTTP 412 MissingSdk OR HTTP 200 if all workloads available
+# Test 4: HTTP 200, standard compilation success
+# Test 5: HTTP 200, generated files excluded from text size calculation
+
+### Error Testing
+
+### Test 6: Repository that might exceed 200MB text limit
+POST http://localhost:5000/analyze
+Content-Type: application/json
+
+{
+  "repoUrl": "https://github.com/aspnet/AspNetCore.git"
+}
+
+### Expected: HTTP 413 LimitsExceeded if text size > 200MB, or HTTP 200 if within limits

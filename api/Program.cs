@@ -27,6 +27,7 @@ builder.Services.AddCors(options =>
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddScoped<IGitService, GitService>();
+builder.Services.AddScoped<IRoslynAnalysisService, RoslynAnalysisService>();
 
 var app = builder.Build();
 
@@ -56,7 +57,7 @@ app.MapGet("/health", () =>
 .WithOpenApi();
 
 // POST /analyze endpoint with temp workspace and shallow clone
-app.MapPost("/analyze", async (AnalyzeRequest request, IGitService gitService, ILogger<Program> logger, CancellationToken cancellationToken) =>
+app.MapPost("/analyze", async (AnalyzeRequest request, IGitService gitService, IRoslynAnalysisService roslynService, ILogger<Program> logger, CancellationToken cancellationToken) =>
 {
     string? tempPath = null;
     
@@ -106,7 +107,32 @@ app.MapPost("/analyze", async (AnalyzeRequest request, IGitService gitService, I
             logger.LogInformation("Using {ProjectCount} project files", discoveryResult.ProjectPaths.Count);
         }
         
-        // For now, return empty but schema-correct payload (actual analysis will be implemented in later steps)
+        // Step 4: Perform Roslyn analysis (Build + TFM + Exclude Tests)
+        var analysisResult = await roslynService.AnalyzeAsync(tempPath, discoveryResult, cancellationToken);
+        if (!analysisResult.Success)
+        {
+            logger.LogError("Roslyn analysis failed: {ErrorCode} - {ErrorMessage}", analysisResult.ErrorCode, analysisResult.ErrorMessage);
+            
+            var statusCode = analysisResult.ErrorCode switch
+            {
+                "MissingSdk" => 412,
+                "BuildFailed" => 424,
+                "LimitsExceeded" => 413,
+                _ => 500
+            };
+            
+            return Results.Json(
+                new ErrorResponse 
+                { 
+                    Code = analysisResult.ErrorCode!, 
+                    Message = analysisResult.ErrorMessage! 
+                }, 
+                statusCode: statusCode);
+        }
+        
+        logger.LogInformation("Roslyn analysis completed successfully with {CompilationCount} compilations", analysisResult.Compilations.Count);
+        
+        // For now, return empty but schema-correct payload (dependency extraction will be implemented in Step 7)
         var response = new AnalyzeResponse
         {
             Meta = new Meta
@@ -167,6 +193,28 @@ app.MapPost("/analyze", async (AnalyzeRequest request, IGitService gitService, I
                 Message = "Could not clone the repository. Ensure the URL is public and reachable." 
             }, 
             statusCode: 502);
+    }
+    catch (InvalidOperationException ex) when (ex.Message.StartsWith("MissingSdk"))
+    {
+        logger.LogError(ex, "Missing SDK for repository: {RepoUrl}", request.RepoUrl);
+        return Results.Json(
+            new ErrorResponse 
+            { 
+                Code = "MissingSdk", 
+                Message = ex.Message.Substring("MissingSdk: ".Length) 
+            }, 
+            statusCode: 412);
+    }
+    catch (InvalidOperationException ex) when (ex.Message.StartsWith("BuildFailed"))
+    {
+        logger.LogError(ex, "Build failed for repository: {RepoUrl}", request.RepoUrl);
+        return Results.Json(
+            new ErrorResponse 
+            { 
+                Code = "BuildFailed", 
+                Message = ex.Message.Substring("BuildFailed: ".Length) 
+            }, 
+            statusCode: 424);
     }
     catch (Exception ex)
     {
