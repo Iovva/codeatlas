@@ -1,0 +1,47 @@
+### Test Step 4 - Temp Workspace + Shallow Clone + Cleanup
+
+### Health check
+GET http://localhost:5000/health
+
+### Test 1: Valid public C# repository (should succeed)
+POST http://localhost:5000/analyze
+Content-Type: application/json
+
+{
+  "repoUrl": "https://github.com/dotnet/samples.git"
+}
+
+### Test 2: Valid public C# repository with branch
+POST http://localhost:5000/analyze
+Content-Type: application/json
+
+{
+  "repoUrl": "https://github.com/dotnet/samples.git",
+  "branch": "main"
+}
+
+### Test 3: Invalid repository URL (should return 502 CloneFailed)
+POST http://localhost:5000/analyze
+Content-Type: application/json
+
+{
+  "repoUrl": "https://github.com/nonexistent/invalid-repo.git"
+}
+
+### Test 4: Non-existent branch (should return 502 CloneFailed)
+POST http://localhost:5000/analyze
+Content-Type: application/json
+
+{
+  "repoUrl": "https://github.com/dotnet/samples.git",
+  "branch": "nonexistent-branch"
+}
+
+### Test 5: Large repository (should return 413 LimitsExceeded if > 8000 files)
+# Note: This might pass depending on the repo size
+POST http://localhost:5000/analyze
+Content-Type: application/json
+
+{
+  "repoUrl": "https://github.com/dotnet/aspnetcore.git"
+}
