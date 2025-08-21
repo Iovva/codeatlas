@@ -8,6 +8,16 @@ public interface IGitService
     Task<string> CloneRepositoryAsync(string repoUrl, string? branch, CancellationToken cancellationToken);
     void CleanupTempDirectory(string tempPath);
     int CountCSharpFiles(string repoPath);
+    SolutionDiscoveryResult DiscoverSolutionOrProjects(string repoPath);
+}
+
+public class SolutionDiscoveryResult
+{
+    public bool Success { get; set; }
+    public string? SolutionPath { get; set; }
+    public List<string> ProjectPaths { get; set; } = new();
+    public string? ErrorCode { get; set; }
+    public string? ErrorMessage { get; set; }
 }
 
 public class GitService : IGitService
@@ -319,5 +329,105 @@ public class GitService : IGitService
 
         // Default: assume it needs https:// prefix
         return $"https://{trimmedUrl}";
+    }
+
+    public SolutionDiscoveryResult DiscoverSolutionOrProjects(string repoPath)
+    {
+        _logger.LogInformation("Starting solution/project discovery in path: {RepoPath}", repoPath);
+        
+        if (!Directory.Exists(repoPath))
+        {
+            _logger.LogError("Repository path does not exist: {RepoPath}", repoPath);
+            return new SolutionDiscoveryResult
+            {
+                Success = false,
+                ErrorCode = "NoSolutionOrProject",
+                ErrorMessage = "No `.sln` or `.csproj` found in the repository. Provide a C# solution/project repo or specify a path to the `.sln`."
+            };
+        }
+
+        try
+        {
+            // Step 1: Look for solution at repo root
+            var rootSolutionFiles = Directory.GetFiles(repoPath, "*.sln", SearchOption.TopDirectoryOnly);
+            if (rootSolutionFiles.Length > 0)
+            {
+                var chosenSolution = rootSolutionFiles[0];
+                _logger.LogInformation("Found solution at repo root: {SolutionPath}", chosenSolution);
+                
+                if (rootSolutionFiles.Length > 1)
+                {
+                    _logger.LogInformation("Multiple solutions found at root, chose first: {ChosenSolution}. Available: {AllSolutions}", 
+                        chosenSolution, string.Join(", ", rootSolutionFiles.Select(Path.GetFileName)));
+                }
+                
+                return new SolutionDiscoveryResult
+                {
+                    Success = true,
+                    SolutionPath = chosenSolution
+                };
+            }
+
+            // Step 2: Perform DFS to find first .sln file in subdirectories
+            var allSolutionFiles = Directory.GetFiles(repoPath, "*.sln", SearchOption.AllDirectories);
+            if (allSolutionFiles.Length > 0)
+            {
+                // Sort to get consistent DFS ordering
+                Array.Sort(allSolutionFiles);
+                var chosenSolution = allSolutionFiles[0];
+                
+                _logger.LogInformation("Found solution via DFS: {SolutionPath}", chosenSolution);
+                
+                if (allSolutionFiles.Length > 1)
+                {
+                    _logger.LogInformation("Multiple solutions found, chose first by DFS: {ChosenSolution}. Available: {AllSolutions}",
+                        chosenSolution, string.Join(", ", allSolutionFiles.Select(s => Path.GetRelativePath(repoPath, s))));
+                }
+                
+                return new SolutionDiscoveryResult
+                {
+                    Success = true,
+                    SolutionPath = chosenSolution
+                };
+            }
+
+            // Step 3: Enumerate all .csproj files
+            var projectFiles = Directory.GetFiles(repoPath, "*.csproj", SearchOption.AllDirectories);
+            if (projectFiles.Length > 0)
+            {
+                _logger.LogInformation("No solution files found, using {ProjectCount} project files: {ProjectFiles}",
+                    projectFiles.Length, string.Join(", ", projectFiles.Take(5).Select(p => Path.GetRelativePath(repoPath, p))));
+                
+                if (projectFiles.Length > 5)
+                {
+                    _logger.LogInformation("... and {AdditionalCount} more project files", projectFiles.Length - 5);
+                }
+                
+                return new SolutionDiscoveryResult
+                {
+                    Success = true,
+                    ProjectPaths = projectFiles.ToList()
+                };
+            }
+
+            // Step 4: No .sln or .csproj found
+            _logger.LogWarning("No .sln or .csproj files found in repository: {RepoPath}", repoPath);
+            return new SolutionDiscoveryResult
+            {
+                Success = false,
+                ErrorCode = "NoSolutionOrProject",
+                ErrorMessage = "No `.sln` or `.csproj` found in the repository. Provide a C# solution/project repo or specify a path to the `.sln`."
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error during solution/project discovery in {RepoPath}", repoPath);
+            return new SolutionDiscoveryResult
+            {
+                Success = false,
+                ErrorCode = "NoSolutionOrProject",
+                ErrorMessage = "No `.sln` or `.csproj` found in the repository. Provide a C# solution/project repo or specify a path to the `.sln`."
+            };
+        }
     }
 }

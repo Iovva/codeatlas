@@ -69,19 +69,42 @@ app.MapPost("/analyze", async (AnalyzeRequest request, IGitService gitService, I
         
         // Step 2: Count C# files and check limits
         var csFileCount = gitService.CountCSharpFiles(tempPath);
-        if (csFileCount > 8000)
+        if (csFileCount > 100000)
         {
-            logger.LogWarning("Repository has {Count} C# files, exceeding limit of 8,000", csFileCount);
+            logger.LogWarning("Repository has {Count} C# files, exceeding limit of 100,000", csFileCount);
             return Results.Json(
                 new ErrorResponse 
                 { 
                     Code = "LimitsExceeded", 
-                    Message = $"Repository contains {csFileCount} C# files, exceeding the limit of 8,000 files" 
+                    Message = $"Repository contains {csFileCount} C# files, exceeding the limit of 100,000 files" 
                 }, 
                 statusCode: 413);
         }
         
         logger.LogInformation("Repository contains {Count} C# files, within limits", csFileCount);
+        
+        // Step 3: Discover solution or project files
+        var discoveryResult = gitService.DiscoverSolutionOrProjects(tempPath);
+        if (!discoveryResult.Success)
+        {
+            logger.LogWarning("No solution or project files found in repository: {RepoUrl}", request.RepoUrl);
+            return Results.Json(
+                new ErrorResponse 
+                { 
+                    Code = discoveryResult.ErrorCode!, 
+                    Message = discoveryResult.ErrorMessage! 
+                }, 
+                statusCode: 400);
+        }
+        
+        if (!string.IsNullOrEmpty(discoveryResult.SolutionPath))
+        {
+            logger.LogInformation("Using solution file: {SolutionPath}", discoveryResult.SolutionPath);
+        }
+        else if (discoveryResult.ProjectPaths.Count > 0)
+        {
+            logger.LogInformation("Using {ProjectCount} project files", discoveryResult.ProjectPaths.Count);
+        }
         
         // For now, return empty but schema-correct payload (actual analysis will be implemented in later steps)
         var response = new AnalyzeResponse

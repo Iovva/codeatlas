@@ -1,0 +1,51 @@
+###
+# Step 5 Testing: Solution/Project Discovery
+# Test four scenarios as specified in the implementation plan
+
+### Test 1: Repository with root .sln (should succeed and log chosen solution)
+POST http://localhost:5000/analyze
+Content-Type: application/json
+
+{
+  "repoUrl": "https://github.com/dotnet/samples.git"
+}
+
+### Test 2: Repository with multiple .sln in folders (should succeed and log DFS-first path)
+POST http://localhost:5000/analyze
+Content-Type: application/json
+
+{
+  "repoUrl": "https://github.com/aspnet/AspNetCore.git"
+}
+
+### Test 3: Repository with only .csproj files (should proceed using projects, no error)
+POST http://localhost:5000/analyze
+Content-Type: application/json
+
+{
+  "repoUrl": "https://github.com/dotnet/BenchmarkDotNet.git"
+}
+
+### Test 4: Non-C# repository (should return 400 NoSolutionOrProject with exact message)
+POST http://localhost:5000/analyze
+Content-Type: application/json
+
+{
+  "repoUrl": "https://github.com/microsoft/TypeScript.git"
+}
+
+### Test 5: Repository with project at root level (ensure we handle single project correctly)
+POST http://localhost:5000/analyze
+Content-Type: application/json
+
+{
+  "repoUrl": "https://github.com/dotnet/command-line-api.git"
+}
+
+### Test 6: Small C# library with simple structure
+POST http://localhost:5000/analyze
+Content-Type: application/json
+
+{
+  "repoUrl": "https://github.com/JamesNK/Newtonsoft.Json.git"
+}
