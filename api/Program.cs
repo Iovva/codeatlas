@@ -130,9 +130,45 @@ app.MapPost("/analyze", async (AnalyzeRequest request, IGitService gitService, I
                 statusCode: statusCode);
         }
         
-        logger.LogInformation("Roslyn analysis completed successfully with {CompilationCount} compilations", analysisResult.Compilations.Count);
+        logger.LogInformation("Roslyn analysis completed successfully with {CompilationCount} compilations and {DependencyCount} dependencies", 
+            analysisResult.Compilations.Count, analysisResult.Dependencies.Count);
         
-        // For now, return empty but schema-correct payload (dependency extraction will be implemented in Step 7)
+        // Step 7: Build file graph from extracted dependencies
+        var fileNodes = new List<Node>();
+        var fileEdges = new List<Edge>();
+        
+        // Create file nodes with canonical IDs (File:<RELATIVE_PATH_FROM_REPO_ROOT>)
+        var allFiles = analysisResult.Dependencies
+            .SelectMany(d => new[] { d.FromFile, d.ToFile })
+            .Distinct()
+            .OrderBy(f => f)
+            .ToList();
+            
+        foreach (var file in allFiles)
+        {
+            var nodeId = $"File:{file}";
+            var fileName = Path.GetFileName(file);
+            
+            fileNodes.Add(new Node
+            {
+                Id = nodeId,
+                Label = fileName,
+                Loc = 0, // LOC calculation will be implemented in Step 9
+                FanIn = 0, // Fan-in calculation will be implemented in Step 9
+                FanOut = 0 // Fan-out calculation will be implemented in Step 9
+            });
+        }
+        
+        // Create file edges from dependencies
+        foreach (var dependency in analysisResult.Dependencies)
+        {
+            fileEdges.Add(new Edge
+            {
+                From = $"File:{dependency.FromFile}",
+                To = $"File:{dependency.ToFile}"
+            });
+        }
+        
         var response = new AnalyzeResponse
         {
             Meta = new Meta
@@ -146,27 +182,27 @@ app.MapPost("/analyze", async (AnalyzeRequest request, IGitService gitService, I
             {
                 Namespace = new Graph
                 {
-                    Nodes = new List<Node>(),
+                    Nodes = new List<Node>(), // Namespace aggregation will be implemented in Step 8
                     Edges = new List<Edge>()
                 },
                 File = new Graph
                 {
-                    Nodes = new List<Node>(),
-                    Edges = new List<Edge>()
+                    Nodes = fileNodes,
+                    Edges = fileEdges
                 }
             },
             Metrics = new Metrics
             {
                 Counts = new Counts
                 {
-                    NamespaceNodes = 0,
-                    FileNodes = 0,
-                    Edges = 0
+                    NamespaceNodes = 0, // Will be populated in Step 8
+                    FileNodes = fileNodes.Count,
+                    Edges = fileEdges.Count
                 },
-                FanInTop = new List<Node>(),
-                FanOutTop = new List<Node>()
+                FanInTop = new List<Node>(), // Will be calculated in Step 9
+                FanOutTop = new List<Node>() // Will be calculated in Step 9
             },
-            Cycles = new List<Cycle>()
+            Cycles = new List<Cycle>() // Will be implemented in Step 10
         };
         
         logger.LogInformation("Analysis completed successfully for repository: {RepoUrl}", request.RepoUrl);

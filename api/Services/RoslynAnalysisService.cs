@@ -1,5 +1,6 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Text;
 using System.Text.RegularExpressions;
 using CodeAtlas.Api.Models;
@@ -26,9 +27,7 @@ public class RoslynAnalysisService : IRoslynAnalysisService
 
         try
         {
-            // For Step 6, we'll focus on basic project loading without full compilation
-            // Full dependency analysis will be implemented in Step 7
-            _logger.LogInformation("Performing basic project structure analysis (Step 6 - Build validation)");
+            _logger.LogInformation("Performing dependency extraction analysis (Step 7 - File→File Dependencies)");
             
             // Use the direct Roslyn approach - no MSBuild dependency
             var projectsToAnalyze = await CreateProjectsForValidation(discoveryResult, cancellationToken);
@@ -46,7 +45,7 @@ public class RoslynAnalysisService : IRoslynAnalysisService
                 if (projectsToAnalyze.Count == 0)
                 {
                     _logger.LogWarning("No projects could be loaded, but allowing Step 6 to complete with minimal validation");
-                    return RoslynAnalysisResult.CreateSuccess(new List<Compilation>(), new List<Project>());
+                    return RoslynAnalysisResult.CreateSuccess(new List<Compilation>(), new List<Project>(), new List<DependencyEdge>());
                 }
                 
                 var sampleProjects = string.Join(", ", projectsToAnalyze.Take(5).Select(p => p.Name));
@@ -69,12 +68,23 @@ public class RoslynAnalysisService : IRoslynAnalysisService
             {
                 // If no compilations available, try to work with the project structure anyway
                 _logger.LogWarning("No compilations available, but continuing with project analysis");
-                return RoslynAnalysisResult.CreateSuccess(new List<Compilation>(), filteredProjects);
+                return RoslynAnalysisResult.CreateSuccess(new List<Compilation>(), filteredProjects, new List<DependencyEdge>());
             }
 
             _logger.LogInformation("Successfully compiled {ProjectCount} projects for analysis", compilations.Count);
 
-            return RoslynAnalysisResult.CreateSuccess(compilations, filteredProjects);
+            // Step 7: Extract file-to-file dependencies from symbol references
+            var dependencies = await ExtractDependenciesAsync(workspacePath, compilations, cancellationToken);
+            
+            if (dependencies.Count > 150000)
+            {
+                return RoslynAnalysisResult.CreateError("LimitsExceeded", 
+                    $"Dependency graph contains {dependencies.Count} edges, exceeding the limit of 150,000 edges");
+            }
+
+            _logger.LogInformation("Extracted {DependencyCount} file-to-file dependencies", dependencies.Count);
+
+            return RoslynAnalysisResult.CreateSuccess(compilations, filteredProjects, dependencies);
         }
         catch (Exception ex)
         {
@@ -469,6 +479,206 @@ public class RoslynAnalysisService : IRoslynAnalysisService
 
         return false;
     }
+
+    /// <summary>
+    /// Extract file-to-file dependencies from symbol references within the solution
+    /// </summary>
+    private async Task<List<DependencyEdge>> ExtractDependenciesAsync(string workspacePath, List<Compilation> compilations, CancellationToken cancellationToken)
+    {
+        _logger.LogInformation("Starting dependency extraction from {CompilationCount} compilations", compilations.Count);
+        
+        var dependencies = new HashSet<DependencyEdge>();
+        var allDocuments = new Dictionary<string, string>(); // file path -> relative path from repo root
+        
+        // First, build a map of all source files in the solution
+        foreach (var compilation in compilations)
+        {
+            foreach (var syntaxTree in compilation.SyntaxTrees)
+            {
+                if (!string.IsNullOrEmpty(syntaxTree.FilePath) && File.Exists(syntaxTree.FilePath))
+                {
+                    var relativePath = GetRelativePath(workspacePath, syntaxTree.FilePath);
+                    allDocuments[syntaxTree.FilePath] = relativePath;
+                }
+            }
+        }
+        
+        _logger.LogInformation("Found {DocumentCount} source files in solution", allDocuments.Count);
+        
+        // Process each compilation to find symbol references
+        foreach (var compilation in compilations)
+        {
+            await ProcessCompilationForDependencies(compilation, allDocuments, dependencies, cancellationToken);
+        }
+        
+        var result = dependencies.ToList();
+        _logger.LogInformation("Extracted {DependencyCount} unique file-to-file dependencies", result.Count);
+        
+        return result;
+    }
+    
+    /// <summary>
+    /// Process a single compilation to extract dependencies
+    /// </summary>
+    private async Task ProcessCompilationForDependencies(Compilation compilation, Dictionary<string, string> allDocuments, HashSet<DependencyEdge> dependencies, CancellationToken cancellationToken)
+    {
+        foreach (var syntaxTree in compilation.SyntaxTrees)
+        {
+            if (string.IsNullOrEmpty(syntaxTree.FilePath) || !allDocuments.ContainsKey(syntaxTree.FilePath))
+                continue;
+                
+            var fromFile = allDocuments[syntaxTree.FilePath];
+            var semanticModel = compilation.GetSemanticModel(syntaxTree);
+            var root = await syntaxTree.GetRootAsync(cancellationToken);
+            
+            // Find all identifier nodes in the syntax tree
+            var identifiers = root.DescendantNodes()
+                .OfType<IdentifierNameSyntax>()
+                .Where(id => !IsUsingDirective(id)) // Exclude using statements
+                .ToList();
+            
+            foreach (var identifier in identifiers)
+            {
+                try
+                {
+                    var symbolInfo = semanticModel.GetSymbolInfo(identifier, cancellationToken);
+                    var symbol = symbolInfo.Symbol;
+                    
+                    if (symbol != null)
+                    {
+                        var declaringFiles = GetDeclaringFiles(symbol, allDocuments);
+                        
+                        foreach (var toFile in declaringFiles)
+                        {
+                            if (fromFile != toFile || HasSelfReference(identifier, symbol))
+                            {
+                                dependencies.Add(new DependencyEdge(fromFile, toFile));
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    // Log but continue processing other identifiers
+                    _logger.LogDebug(ex, "Failed to resolve symbol for identifier {Identifier} in file {File}", identifier.Identifier.ValueText, fromFile);
+                }
+            }
+        }
+    }
+    
+    /// <summary>
+    /// Check if an identifier is part of a using directive (should be excluded)
+    /// </summary>
+    private bool IsUsingDirective(IdentifierNameSyntax identifier)
+    {
+        var parent = identifier.Parent;
+        while (parent != null)
+        {
+            if (parent is UsingDirectiveSyntax)
+                return true;
+            parent = parent.Parent;
+        }
+        return false;
+    }
+    
+    /// <summary>
+    /// Get the files where a symbol is declared, filtered to only include files within the solution
+    /// </summary>
+    private List<string> GetDeclaringFiles(ISymbol symbol, Dictionary<string, string> allDocuments)
+    {
+        var declaringFiles = new List<string>();
+        
+        // Handle partial classes - get all declaration locations
+        var locations = symbol.Locations.Where(loc => loc.IsInSource).ToList();
+        
+        foreach (var location in locations)
+        {
+            var sourceTree = location.SourceTree;
+            if (sourceTree?.FilePath != null && allDocuments.ContainsKey(sourceTree.FilePath))
+            {
+                var relativePath = allDocuments[sourceTree.FilePath];
+                if (!declaringFiles.Contains(relativePath))
+                {
+                    declaringFiles.Add(relativePath);
+                }
+            }
+        }
+        
+        // For partial classes, use the first declaring location as per specification
+        if (declaringFiles.Count > 1)
+        {
+            return new List<string> { declaringFiles.First() };
+        }
+        
+        return declaringFiles;
+    }
+    
+    /// <summary>
+    /// Check if this represents a real self-reference (not just a declaration)
+    /// </summary>
+    private bool HasSelfReference(IdentifierNameSyntax identifier, ISymbol symbol)
+    {
+        // Simple heuristic: if the identifier is in a method body or property body, it's likely a real reference
+        var parent = identifier.Parent;
+        while (parent != null)
+        {
+            if (parent is MethodDeclarationSyntax || parent is PropertyDeclarationSyntax || 
+                parent is ConstructorDeclarationSyntax || parent is FieldDeclarationSyntax ||
+                parent is BlockSyntax || parent is ArrowExpressionClauseSyntax)
+            {
+                return true;
+            }
+            parent = parent.Parent;
+        }
+        
+        return false;
+    }
+    
+    /// <summary>
+    /// Get relative path from workspace root, using forward slashes as specified
+    /// </summary>
+    private string GetRelativePath(string workspacePath, string filePath)
+    {
+        var relativePath = Path.GetRelativePath(workspacePath, filePath);
+        return relativePath.Replace('\\', '/'); // Use forward slashes as per specification
+    }
+}
+
+/// <summary>
+/// Represents a dependency edge between two files
+/// </summary>
+public class DependencyEdge : IEquatable<DependencyEdge>
+{
+    public string FromFile { get; }
+    public string ToFile { get; }
+    
+    public DependencyEdge(string fromFile, string toFile)
+    {
+        FromFile = fromFile ?? throw new ArgumentNullException(nameof(fromFile));
+        ToFile = toFile ?? throw new ArgumentNullException(nameof(toFile));
+    }
+    
+    public bool Equals(DependencyEdge? other)
+    {
+        if (other is null) return false;
+        if (ReferenceEquals(this, other)) return true;
+        return FromFile == other.FromFile && ToFile == other.ToFile;
+    }
+    
+    public override bool Equals(object? obj)
+    {
+        return Equals(obj as DependencyEdge);
+    }
+    
+    public override int GetHashCode()
+    {
+        return HashCode.Combine(FromFile, ToFile);
+    }
+    
+    public override string ToString()
+    {
+        return $"{FromFile} -> {ToFile}";
+    }
 }
 
 public class RoslynAnalysisResult
@@ -478,14 +688,16 @@ public class RoslynAnalysisResult
     public string? ErrorMessage { get; init; }
     public List<Compilation> Compilations { get; init; } = new();
     public List<Project> Projects { get; init; } = new();
+    public List<DependencyEdge> Dependencies { get; init; } = new();
 
-    public static RoslynAnalysisResult CreateSuccess(List<Compilation> compilations, List<Project> projects)
+    public static RoslynAnalysisResult CreateSuccess(List<Compilation> compilations, List<Project> projects, List<DependencyEdge> dependencies)
     {
         return new RoslynAnalysisResult
         {
             Success = true,
             Compilations = compilations,
-            Projects = projects
+            Projects = projects,
+            Dependencies = dependencies
         };
     }
 
@@ -495,7 +707,8 @@ public class RoslynAnalysisResult
         {
             Success = false,
             ErrorCode = code,
-            ErrorMessage = message
+            ErrorMessage = message,
+            Dependencies = new List<DependencyEdge>()
         };
     }
 }

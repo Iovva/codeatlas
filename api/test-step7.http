@@ -1,0 +1,25 @@
+### Test Step 7: File→File Dependencies (Core Extraction)
+
+# Test a small repository with known file relationships
+POST http://localhost:5000/analyze
+Content-Type: application/json
+
+{
+  "repoUrl": "https://github.com/dotnet/samples.git"
+}
+
+### Test invalid repository (should return CloneFailed)
+POST http://localhost:5000/analyze
+Content-Type: application/json
+
+{
+  "repoUrl": "https://github.com/invalid/nonexistent-repo.git"
+}
+
+### Test repository with dependency relationships
+POST http://localhost:5000/analyze
+Content-Type: application/json
+
+{
+  "repoUrl": "https://github.com/nunit/nunit.git"
+}
