@@ -1,0 +1,6 @@
+@CodeAtlas.Api_HostAddress = http://localhost:5265
+
+GET {{CodeAtlas.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

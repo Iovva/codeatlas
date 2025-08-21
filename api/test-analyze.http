@@ -1,0 +1,16 @@
+### Test the /analyze endpoint with valid request
+POST http://localhost:5000/analyze
+Content-Type: application/json
+
+{
+  "repoUrl": "https://github.com/dotnet/runtime",
+  "branch": "main"
+}
+
+### Test the /analyze endpoint without branch
+POST http://localhost:5000/analyze
+Content-Type: application/json
+
+{
+  "repoUrl": "https://github.com/newtonsoft/newtonsoft.json"
+}
