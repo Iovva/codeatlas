@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Subject, takeUntil } from 'rxjs';
@@ -16,6 +16,8 @@ import { FilterTreeComponent } from '../../shared/filter-tree/filter-tree.compon
   styleUrl: './explorer.css'
 })
 export class Explorer implements OnInit, OnDestroy {
+  @ViewChild(GraphCanvasComponent) graphCanvas!: GraphCanvasComponent;
+  
   repoUrl: string = '';
   branch: string = '';
   
@@ -30,6 +32,12 @@ export class Explorer implements OnInit, OnDestroy {
     neighborsOnly: false,
     selectedNodeId: null
   };
+  
+  // Resizable filter panel state
+  filterPanelWidth: number = 300; // Default width
+  private isResizing: boolean = false;
+  private startX: number = 0;
+  private startWidth: number = 0;
   
   private destroy$ = new Subject<void>();
 
@@ -60,6 +68,10 @@ export class Explorer implements OnInit, OnDestroy {
   ngOnDestroy(): void {
     this.destroy$.next();
     this.destroy$.complete();
+    
+    // Clean up resize event listeners
+    document.removeEventListener('mousemove', this.handleResize.bind(this));
+    document.removeEventListener('mouseup', this.stopResize.bind(this));
   }
 
   // Convenience getters
@@ -247,6 +259,11 @@ export class Explorer implements OnInit, OnDestroy {
         selectedNodeId: node.id
       };
       
+      // Center the graph on the selected node (only for filter tree selections)
+      if (this.graphCanvas) {
+        this.graphCanvas.centerOnNode(node.id);
+      }
+      
       // Open the right drawer
       this.onNodeSelected(selectedNodeInfo);
     } else {
@@ -303,5 +320,43 @@ export class Explorer implements OnInit, OnDestroy {
       ? this.analysisResult.graphs.namespace 
       : this.analysisResult.graphs.file;
     return graphData?.edges?.length || 0;
+  }
+
+  // Resizable filter panel methods
+  startResize(event: MouseEvent): void {
+    event.preventDefault();
+    this.isResizing = true;
+    this.startX = event.clientX;
+    this.startWidth = this.filterPanelWidth;
+    
+    // Add global event listeners
+    document.addEventListener('mousemove', this.handleResize.bind(this));
+    document.addEventListener('mouseup', this.stopResize.bind(this));
+    
+    // Add visual feedback
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  }
+
+  private handleResize(event: MouseEvent): void {
+    if (!this.isResizing) return;
+    
+    const deltaX = event.clientX - this.startX;
+    const newWidth = this.startWidth + deltaX;
+    
+    // Constrain width between 200px and 600px
+    this.filterPanelWidth = Math.max(200, Math.min(600, newWidth));
+  }
+
+  private stopResize(): void {
+    this.isResizing = false;
+    
+    // Remove global event listeners
+    document.removeEventListener('mousemove', this.handleResize.bind(this));
+    document.removeEventListener('mouseup', this.stopResize.bind(this));
+    
+    // Remove visual feedback
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
   }
 }

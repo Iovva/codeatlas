@@ -511,4 +511,45 @@ export class GraphCanvasComponent implements OnInit, OnDestroy, OnChanges {
     if (!this.cy) return 100;
     return Math.round(this.cy.zoom() * 100);
   }
+
+  /**
+   * Centers the graph view on a specific node
+   * Used when selecting nodes from the filter tree
+   */
+  public centerOnNode(nodeId: string): void {
+    if (!this.cy) return;
+    
+    const node = this.cy.getElementById(nodeId);
+    if (node.length === 0) {
+      console.warn(`🎯 Cannot center on node ${nodeId} - node not found in graph`);
+      return;
+    }
+    
+    console.log(`🎯 Centering graph on node: ${nodeId}`);
+    
+    // Get container dimensions
+    const containerWidth = this.cy.width();
+    const containerHeight = this.cy.height();
+    
+    // Calculate offset to position node closer to the left panel
+    // This moves the node away from the right panel area
+    const xOffset = containerWidth * 0.15; // Move 15% to the right from center (towards left panel)
+    const yOffset = 0; // Keep vertically centered
+    
+    // Get node position and calculate target position
+    const nodePosition = node.position();
+    const targetX = nodePosition.x + xOffset; // Add offset to move right (towards left panel)
+    const targetY = nodePosition.y - yOffset;
+    
+    // Animate to the adjusted center position
+    this.cy.animate({
+      pan: {
+        x: (containerWidth / 2) - targetX,
+        y: (containerHeight / 2) - targetY
+      },
+      zoom: Math.max(this.cy.zoom(), 1.0), // Ensure reasonable zoom level
+      duration: 500,
+      easing: 'ease-out'
+    });
+  }
 }

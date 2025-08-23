@@ -112,7 +112,7 @@
   <!-- Main Content Area -->
   <div class="main-area d-flex h-100">
     <!-- Left Filter Tree -->
-    <div class="filter-tree-panel" *ngIf="analysisResult && !isAnalyzing">
+    <div class="filter-tree-panel" *ngIf="analysisResult && !isAnalyzing" [style.width.px]="filterPanelWidth">
       <app-filter-tree
         [analysisResult]="analysisResult"
         [currentScope]="currentScope"
@@ -120,6 +120,10 @@
         (nodesVisibilityChanged)="onNodesVisibilityChanged($event)"
         (nodeSelected)="onFilterTreeNodeSelected($event)">
       </app-filter-tree>
+      
+      <!-- Resize Handle -->
+      <div class="resize-handle" 
+           (mousedown)="startResize($event)"></div>
     </div>
 
     <!-- Graph Canvas Area -->
