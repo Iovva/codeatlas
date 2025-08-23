@@ -117,7 +117,8 @@
         [analysisResult]="analysisResult"
         [currentScope]="currentScope"
         [hiddenNodes]="filterState.hiddenNodes"
-        (nodesVisibilityChanged)="onNodesVisibilityChanged($event)">
+        (nodesVisibilityChanged)="onNodesVisibilityChanged($event)"
+        (nodeSelected)="onFilterTreeNodeSelected($event)">
       </app-filter-tree>
     </div>
 

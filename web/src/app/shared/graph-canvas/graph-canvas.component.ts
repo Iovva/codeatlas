@@ -80,8 +80,15 @@ export class GraphCanvasComponent implements OnInit, OnDestroy, OnChanges {
   
   ngOnChanges(changes: SimpleChanges): void {
     if (changes['analysisResult'] || changes['currentScope']) {
+      console.log('🔄 Scope or analysis result changed', {
+        currentScope: this.currentScope,
+        hasAnalysisResult: !!this.analysisResult
+      });
+      
       // Wait for Cytoscape to be ready before updating
-      setTimeout(() => this.updateGraph(), 100);
+      setTimeout(() => {
+        this.updateGraph();
+      }, 100);
     }
     
     if (changes['searchTerm']) {
@@ -243,8 +250,12 @@ export class GraphCanvasComponent implements OnInit, OnDestroy, OnChanges {
     
     this.cy.add([...nodes, ...edges]);
     
-    // Trigger layout update
-    this.layoutSubject.next();
+    // Apply filters immediately to new elements
+    this.applyFilters();
+    
+    // Force immediate layout update for scope changes
+    console.log('🔄 Forcing immediate layout after scope change');
+    this.runLayout();
   }
   
   private getCurrentGraphData(): GraphData | null {
@@ -256,12 +267,25 @@ export class GraphCanvasComponent implements OnInit, OnDestroy, OnChanges {
   }
   
   private async runLayout(): Promise<void> {
-    if (!this.cy) return;
+    if (!this.cy) {
+      console.warn('🚨 runLayout called but Cytoscape not initialized');
+      return;
+    }
     
     const nodes = this.cy.nodes().not('.hidden');
     const edges = this.cy.edges().not('.hidden');
     
-    if (nodes.length === 0) return;
+    console.log('🎯 Running layout', {
+      totalNodes: this.cy.nodes().length,
+      visibleNodes: nodes.length,
+      totalEdges: this.cy.edges().length,
+      visibleEdges: edges.length
+    });
+    
+    if (nodes.length === 0) {
+      console.warn('🚨 No visible nodes for layout');
+      return;
+    }
     
     // Prepare data for ELK
     const elkNodes = nodes.map(node => ({
@@ -290,21 +314,30 @@ export class GraphCanvasComponent implements OnInit, OnDestroy, OnChanges {
     };
     
     try {
+      console.log('🎯 Starting ELK layout calculation...');
       const elk = new ELK();
       const elkResult = await elk.layout(elkGraph);
+      console.log('✅ ELK layout completed', { 
+        childrenCount: elkResult.children?.length,
+        firstChild: elkResult.children?.[0]
+      });
       
       // Apply positions
       if (elkResult.children) {
+        let positionsApplied = 0;
         elkResult.children.forEach((child: any) => {
           const node = this.cy!.getElementById(child.id);
           if (node.length > 0 && child.x !== undefined && child.y !== undefined) {
             node.position({ x: child.x + (child.width || 80) / 2, y: child.y + (child.height || 50) / 2 });
+            positionsApplied++;
           }
         });
+        console.log('✅ Applied positions to', positionsApplied, 'nodes');
       }
       
       // Fit the viewport
       this.cy.fit(undefined, 50);
+      console.log('✅ Layout completed and viewport fitted');
     } catch (error) {
       console.error('Layout failed:', error);
       // Fallback to simple grid layout

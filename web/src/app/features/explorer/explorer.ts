@@ -198,6 +198,12 @@ export class Explorer implements OnInit, OnDestroy {
   // Graph interaction methods
   onNodeSelected(nodeInfo: SelectedNodeInfo | null): void {
     this.selectedNode = nodeInfo;
+    
+    // Update filter state to keep selectedNodeId in sync
+    this.filterState = {
+      ...this.filterState,
+      selectedNodeId: nodeInfo?.id || null
+    };
   }
 
   onFilterStateChanged(newFilterState: FilterState): void {
@@ -209,6 +215,43 @@ export class Explorer implements OnInit, OnDestroy {
       ...this.filterState, 
       hiddenNodes 
     };
+  }
+
+  onFilterTreeNodeSelected(nodeId: string): void {
+    console.log(`🎯 Filter tree node selected: ${nodeId}`);
+    
+    if (!this.analysisResult) return;
+    
+    // Find the node in the current scope's graph data
+    const nodes = this.currentScope === 'namespace' 
+      ? this.analysisResult.graphs.namespace.nodes 
+      : this.analysisResult.graphs.file.nodes;
+    
+    const node = nodes.find(n => n.id === nodeId);
+    
+    if (node) {
+      // Convert to SelectedNodeInfo format
+      const selectedNodeInfo: SelectedNodeInfo = {
+        id: node.id,
+        label: node.label,
+        loc: node.loc,
+        fanIn: node.fanIn,
+        fanOut: node.fanOut
+      };
+      
+      console.log(`🎯 Opening right drawer for: ${selectedNodeInfo.label}`);
+      
+      // Update filter state to include the selected node ID (for graph canvas)
+      this.filterState = {
+        ...this.filterState,
+        selectedNodeId: node.id
+      };
+      
+      // Open the right drawer
+      this.onNodeSelected(selectedNodeInfo);
+    } else {
+      console.warn(`🎯 Node not found in ${this.currentScope} scope: ${nodeId}`);
+    }
   }
 
   onCloseDrawer(): void {

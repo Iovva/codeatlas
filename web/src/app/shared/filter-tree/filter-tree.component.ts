@@ -29,15 +29,20 @@ export interface TreeNode {
           </span>
         </button>
         
-        <!-- Checkbox -->
-        <div class="form-check">
+        <!-- Checkbox and Label -->
+        <div class="node-content-wrapper">
+          <!-- Standalone Checkbox -->
           <input class="form-check-input" 
                  type="checkbox" 
                  [checked]="node.isChecked"
                  [indeterminate]="node.isIndeterminate"
                  (change)="onCheckboxChange($event)"
+                 (click)="$event.stopPropagation()"
                  [id]="'checkbox-' + node.id">
-          <label class="form-check-label" [for]="'checkbox-' + node.id">
+          
+          <!-- Clickable Label Area (separate from checkbox) -->
+          <div class="node-label-area" 
+               (click)="onLabelClick($event)">
             <span class="material-icons me-1">
               {{ getNodeIcon() }}
             </span>
@@ -45,19 +50,20 @@ export interface TreeNode {
             <span class="node-count" *ngIf="node.nodeIds.size > 1">
               ({{ node.nodeIds.size }})
             </span>
-          </label>
+          </div>
         </div>
       </div>
       
       <!-- Children -->
       <div class="tree-children" *ngIf="node.isExpanded && node.children.length > 0">
-        <app-tree-node 
-          *ngFor="let child of node.children"
-          [node]="child"
-          [level]="level + 1"
-          (nodeToggled)="nodeToggled.emit($event)"
-          (nodeChecked)="nodeChecked.emit($event)">
-        </app-tree-node>
+                  <app-tree-node 
+            *ngFor="let child of node.children"
+            [node]="child"
+            [level]="level + 1"
+            (nodeToggled)="nodeToggled.emit($event)"
+            (nodeChecked)="nodeChecked.emit($event)"
+            (nodeSelected)="nodeSelected.emit($event)">
+          </app-tree-node>
       </div>
     </div>
   `,
@@ -94,22 +100,34 @@ export interface TreeNode {
       font-size: 1.2rem;
     }
     
-    .form-check {
+    .node-content-wrapper {
       display: flex;
       align-items: center;
-      margin: 0;
+      gap: 0.5rem;
     }
     
-    .form-check-label {
-      display: flex;
-      align-items: center;
-      color: #ffffff;
-      font-size: 0.875rem;
+    .form-check-input {
       margin: 0;
       cursor: pointer;
     }
     
-    .form-check-label .material-icons {
+    .node-label-area {
+      display: flex;
+      align-items: center;
+      color: #ffffff;
+      font-size: 0.875rem;
+      cursor: pointer;
+      padding: 0.125rem 0.25rem;
+      border-radius: 3px;
+      transition: background-color 0.2s ease;
+      flex: 1;
+    }
+    
+    .node-label-area:hover {
+      background-color: rgba(255, 255, 255, 0.1);
+    }
+    
+    .node-label-area .material-icons {
       font-size: 1rem;
     }
     
@@ -130,6 +148,7 @@ export class TreeNodeComponent {
   
   @Output() nodeToggled = new EventEmitter<TreeNode>();
   @Output() nodeChecked = new EventEmitter<{ node: TreeNode, checked: boolean }>();
+  @Output() nodeSelected = new EventEmitter<TreeNode>();
   
   toggleNode(): void {
     this.nodeToggled.emit(this.node);
@@ -137,6 +156,12 @@ export class TreeNodeComponent {
   
   onCheckboxChange(event: any): void {
     this.nodeChecked.emit({ node: this.node, checked: event.target.checked });
+  }
+  
+  onLabelClick(event: Event): void {
+    // Prevent event from bubbling up
+    event.stopPropagation();
+    this.nodeSelected.emit(this.node);
   }
   
   getNodeIcon(): string {
@@ -187,7 +212,8 @@ export class TreeNodeComponent {
               [node]="node"
               [level]="0"
               (nodeToggled)="onNodeToggled($event)"
-              (nodeChecked)="onNodeChecked($event)">
+              (nodeChecked)="onNodeChecked($event)"
+              (nodeSelected)="onNodeSelected($event)">
             </app-tree-node>
           </div>
         </div>
@@ -207,6 +233,7 @@ export class FilterTreeComponent implements OnChanges {
   @Input() hiddenNodes: Set<string> = new Set();
   
   @Output() nodesVisibilityChanged = new EventEmitter<Set<string>>();
+  @Output() nodeSelected = new EventEmitter<string>(); // Emits the node ID for selection
   
   rootNodes: TreeNode[] = [];
   
@@ -455,6 +482,17 @@ export class FilterTreeComponent implements OnChanges {
     node.isExpanded = !node.isExpanded;
   }
   
+  onNodeSelected(node: TreeNode): void {
+    // For tree nodes that represent actual graph nodes, emit the first node ID
+    if (node.nodeIds.size > 0) {
+      const nodeId = Array.from(node.nodeIds)[0];
+      console.log(`🎯 Tree node selected: ${node.label} → Selecting graph node: ${nodeId}`);
+      this.nodeSelected.emit(nodeId);
+    } else {
+      console.log(`🎯 Tree node selected: ${node.label} (no graph node to select)`);
+    }
+  }
+  
   onNodeChecked(event: { node: TreeNode, checked: boolean }): void {
     const { node, checked } = event;
     
@@ -594,16 +632,21 @@ export class FilterTreeComponent implements OnChanges {
   getVisibleNodeCount(): number {
     if (!this.analysisResult) return 0;
     
-    const totalNodes = this.currentScope === 'namespace' 
-      ? this.analysisResult.graphs.namespace.nodes.length 
-      : this.analysisResult.graphs.file.nodes.length;
+    // Count only actual graph nodes that are visible
+    const graphNodes = this.currentScope === 'namespace' 
+      ? this.analysisResult.graphs.namespace.nodes 
+      : this.analysisResult.graphs.file.nodes;
     
-    return totalNodes - this.hiddenNodes.size;
+    // Only count graph nodes that are not hidden
+    const visibleGraphNodes = graphNodes.filter(node => !this.hiddenNodes.has(node.id));
+    
+    return visibleGraphNodes.length;
   }
   
   getTotalNodeCount(): number {
     if (!this.analysisResult) return 0;
     
+    // Total count is the actual graph nodes, not tree organizational nodes
     return this.currentScope === 'namespace' 
       ? this.analysisResult.graphs.namespace.nodes.length 
       : this.analysisResult.graphs.file.nodes.length;
