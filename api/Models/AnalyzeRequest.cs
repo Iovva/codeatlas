@@ -10,4 +10,6 @@ public class ErrorResponse
 {
     public required string Code { get; set; }
     public required string Message { get; set; }
+    public List<string>? DetectedLanguages { get; set; }
+    public List<string>? FoundFiles { get; set; }
 }

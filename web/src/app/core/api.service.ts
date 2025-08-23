@@ -45,6 +45,8 @@ export interface AnalysisResult {
 export interface ApiError {
   code: string;
   message: string;
+  detectedLanguages?: string[];
+  foundFiles?: string[];
 }
 
 export type ApiErrorCode = 
@@ -77,7 +79,9 @@ export class ApiService {
       // Backend returned structured error
       apiError = {
         code: error.error.code,
-        message: error.error.message
+        message: error.error.message,
+        detectedLanguages: error.error.detectedLanguages,
+        foundFiles: error.error.foundFiles
       };
     } else if (error.status === 0) {
       // Network error

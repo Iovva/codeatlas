@@ -1,0 +1,28 @@
+<!-- Error Modal Overlay -->
+<div class="modal-overlay" *ngIf="isVisible" (click)="onBackdropClick($event)">
+  <div class="modal-container">
+    <!-- Modal Header -->
+    <div class="modal-header">
+      <div class="modal-icon">
+        <span class="material-icons">error</span>
+      </div>
+      <h2 class="modal-title">{{ currentError?.title }}</h2>
+    </div>
+    
+    <!-- Modal Body -->
+    <div class="modal-body">
+      <p class="modal-message">{{ currentError?.message }}</p>
+      <div class="modal-details" *ngIf="currentError?.details">
+        <div class="details-content">{{ currentError?.details }}</div>
+      </div>
+    </div>
+    
+    <!-- Modal Footer -->
+    <div class="modal-footer">
+      <button type="button" class="btn btn-primary" (click)="closeModal()">
+        <span class="material-icons me-1">check</span>
+        Got it
+      </button>
+    </div>
+  </div>
+</div>

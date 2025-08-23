@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { Subject, takeUntil } from 'rxjs';
 import { ApiService, AnalysisResult, ApiError } from '../../core/api.service';
 import { StateService, AppState, Scope } from '../../core/state.service';
+import { ToasterService } from '../../core/toaster.service';
 
 @Component({
   selector: 'app-explorer',
@@ -22,7 +23,8 @@ export class Explorer implements OnInit, OnDestroy {
 
   constructor(
     private apiService: ApiService,
-    private stateService: StateService
+    private stateService: StateService,
+    private toasterService: ToasterService
   ) {
     this.currentState = this.stateService.currentState;
   }
@@ -84,9 +86,20 @@ export class Explorer implements OnInit, OnDestroy {
       },
       error: (error: ApiError) => {
         console.error('Analysis failed:', error);
-        const displayTitle = this.apiService.getErrorDisplayMessage(error);
-        const errorMessage = `${displayTitle}: ${error.message}`;
-        this.stateService.setError(errorMessage);
+        
+        // IMPORTANT: Stop the loading state
+        this.stateService.setAnalyzing(false);
+        
+        // Check if this is a repository type error with detected languages
+        if (error.code === 'NoSolutionOrProject' && error.detectedLanguages && error.foundFiles) {
+          // Show beautiful modal popup for repository type errors
+          this.toasterService.showRepositoryError(this.repoUrl, error.detectedLanguages, error.foundFiles);
+        } else {
+          // Show traditional error bar for other errors
+          const displayTitle = this.apiService.getErrorDisplayMessage(error);
+          const errorMessage = `${displayTitle}: ${error.message}`;
+          this.stateService.setError(errorMessage);
+        }
       }
     });
   }

@@ -99,13 +99,24 @@ app.MapPost("/analyze", async (AnalyzeRequest request, IGitService gitService, I
         if (!discoveryResult.Success)
         {
             logger.LogWarning("No solution or project files found in repository: {RepoUrl}", request.RepoUrl);
-            return Results.Json(
-                new ErrorResponse 
-                { 
-                    Code = discoveryResult.ErrorCode!, 
-                    Message = discoveryResult.ErrorMessage! 
-                }, 
-                statusCode: 400);
+            
+            // Get repository details for better error reporting
+            var (detectedLanguages, foundFiles) = gitService.DetectRepositoryDetails(tempPath);
+            
+            logger.LogInformation("Detected languages: {Languages}, Found files: {Files}", 
+                string.Join(", ", detectedLanguages), string.Join(", ", foundFiles));
+            
+            var errorResponse = new ErrorResponse 
+            { 
+                Code = discoveryResult.ErrorCode!, 
+                Message = discoveryResult.ErrorMessage!,
+                DetectedLanguages = detectedLanguages,
+                FoundFiles = foundFiles
+            };
+            
+            logger.LogInformation("Returning error response: {ErrorResponse}", System.Text.Json.JsonSerializer.Serialize(errorResponse));
+            
+            return Results.Json(errorResponse, statusCode: 400);
         }
         
         if (!string.IsNullOrEmpty(discoveryResult.SolutionPath))

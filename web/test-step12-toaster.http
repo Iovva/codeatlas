@@ -1,0 +1,239 @@
+### Step 12: Enhanced Toaster Notifications for Repository Type Detection
+### Testing the new beautiful toaster system that shows detailed repository analysis
+
+### WHAT'S NEW - TOASTER SYSTEM:
+# - Beautiful slide-in toaster notifications with dark theme styling
+# - Repository type detection with 20+ popular programming languages
+# - Detailed error messages showing what files were found
+# - Professional UI with Material Icons and backdrop blur effects
+# - Auto-dismiss after 8 seconds or manual close button
+# - Responsive design that works on mobile and desktop
+
+### Key Features to Test:
+# 1. **Repository Type Detection**: Identifies TypeScript, Python, Java, Go, Rust, C++, PHP, Ruby, Swift, Kotlin, Scala, Dart, R, Objective-C, Perl, Lua, Shell, PowerShell, Docker, Documentation
+# 2. **Smart File Detection**: Shows characteristic files (package.json, pom.xml, Cargo.toml, etc.)
+# 3. **Beautiful UI**: Professional toaster with slide animations and Material Design
+# 4. **Detailed Messages**: Shows repository URL, detected languages, and found files
+# 5. **Fallback Errors**: Other errors still show in the traditional error bar
+
+### Test 1: TypeScript/JavaScript Repository
+POST http://localhost:5000/analyze
+Content-Type: application/json
+
+{
+  "repoUrl": "https://github.com/microsoft/TypeScript.git"
+}
+
+### Expected Toaster Message:
+# Title: "Repository Not Supported"
+# Message: "CodeAtlas only analyzes C# repositories. No suitable .sln or .csproj files found."
+# Details: "The repository "https://github.com/microsoft/TypeScript.git" appears to be a TypeScript/JavaScript repository.
+#
+# Found: package.json"
+
+### Test 2: Python Repository  
+POST http://localhost:5000/analyze
+Content-Type: application/json
+
+{
+  "repoUrl": "https://github.com/python/cpython.git"
+}
+
+### Expected Toaster Message:
+# Title: "Repository Not Supported"
+# Details: "The repository "https://github.com/python/cpython.git" appears to be a Python repository.
+#
+# Found: .py files"
+
+### Test 3: Java Repository
+POST http://localhost:5000/analyze
+Content-Type: application/json
+
+{
+  "repoUrl": "https://github.com/openjdk/jdk.git"
+}
+
+### Expected Toaster Message:
+# Details: "The repository "https://github.com/openjdk/jdk.git" appears to be a Java repository.
+#
+# Found: .java files"
+
+### Test 4: Go Repository
+POST http://localhost:5000/analyze
+Content-Type: application/json
+
+{
+  "repoUrl": "https://github.com/golang/go.git"
+}
+
+### Expected Toaster Message:
+# Details: "The repository "https://github.com/golang/go.git" appears to be a Go repository.
+#
+# Found: go.mod"
+
+### Test 5: Rust Repository
+POST http://localhost:5000/analyze
+Content-Type: application/json
+
+{
+  "repoUrl": "https://github.com/rust-lang/rust.git"
+}
+
+### Expected Toaster Message:
+# Details: "The repository "https://github.com/rust-lang/rust.git" appears to be a Rust repository.
+#
+# Found: Cargo.toml"
+
+### Test 6: Multi-Language Repository (React + Node.js)
+POST http://localhost:5000/analyze
+Content-Type: application/json
+
+{
+  "repoUrl": "https://github.com/facebook/react.git"
+}
+
+### Expected Toaster Message:
+# Details: "The repository "https://github.com/facebook/react.git" appears to be a TypeScript/JavaScript repository.
+#
+# Found: package.json"
+
+### Test 7: C++ Repository
+POST http://localhost:5000/analyze
+Content-Type: application/json
+
+{
+  "repoUrl": "https://github.com/microsoft/terminal.git"
+}
+
+### Expected Toaster Message:
+# Details: "The repository appears to be a C++ repository.
+#
+# Found: .cpp files" (or CMakeLists.txt if found)
+
+### Test 8: Mixed Language Repository (might detect multiple)
+POST http://localhost:5000/analyze
+Content-Type: application/json
+
+{
+  "repoUrl": "https://github.com/electron/electron.git"
+}
+
+### Expected Toaster Message:
+# Details: "The repository appears to be a TypeScript/JavaScript/C++ repository.
+#
+# Found: package.json" (shows the first detected file type)
+
+### Test 9: Valid C# Repository (Should NOT show toaster)
+POST http://localhost:5000/analyze
+Content-Type: application/json
+
+{
+  "repoUrl": "https://github.com/nunit/nunit.git"
+}
+
+### Expected Result:
+# - NO toaster notification
+# - Normal successful analysis with graphs and metrics
+# - Traditional success flow
+
+### Test 10: Invalid Repository URL (Should show traditional error)
+POST http://localhost:5000/analyze
+Content-Type: application/json
+
+{
+  "repoUrl": "https://github.com/nonexistent/invalid-repo.git"
+}
+
+### Expected Result:
+# - NO toaster notification (not a repository type error)
+# - Traditional error bar: "Clone Failed: Repository does not exist..."
+# - This error type doesn't trigger the toaster
+
+### Frontend UI Testing (Manual):
+
+### Test 11: Toaster Appearance and Behavior
+# Steps:
+# 1. Start frontend: npm start
+# 2. Enter TypeScript repo: https://github.com/microsoft/TypeScript.git
+# 3. Click Analyze
+#
+# Expected UI Behavior:
+# - Loading state shows initially
+# - Beautiful toaster slides in from the right after error
+# - Toaster shows:
+#   - Red error icon and left border
+#   - "Repository Not Supported" title
+#   - Clear message about C# repositories only
+#   - Code-styled details section with repo URL and detected language
+#   - Close button (X) in top right
+# - Toaster auto-dismisses after 8 seconds
+# - Manual close button works immediately
+# - Responsive design on mobile
+
+### Test 12: Multiple Language Detection
+# Try repositories that contain multiple languages:
+# - Electron (JS + C++)
+# - VS Code (TS + multiple)
+# - Large monorepos
+#
+# Expected: Shows combined language list like "TypeScript/JavaScript/C++"
+
+### Test 13: Edge Cases
+# Test repositories with:
+# - Only documentation (.md files) → "Documentation repository"
+# - Mixed but no clear primary language → Shows detected languages
+# - Very large repos → Same toaster behavior
+# - Empty or minimal repos → "Unknown repository" fallback
+
+### Backend Response Format:
+# The enhanced error response now includes:
+```json
+{
+  "code": "NoSolutionOrProject",
+  "message": "This appears to be a TypeScript/JavaScript repository...",
+  "detectedLanguages": ["TypeScript/JavaScript"],
+  "foundFiles": ["package.json"]
+}
+```
+
+### Supported Languages (20+ Popular):
+# 1. TypeScript/JavaScript (package.json, tsconfig.json, .ts/.js files)
+# 2. Python (requirements.txt, setup.py, .py files)
+# 3. Java (pom.xml, build.gradle, .java files)
+# 4. Go (go.mod, go.sum, .go files)
+# 5. Rust (Cargo.toml, .rs files)
+# 6. C++ (CMakeLists.txt, Makefile, .cpp/.h files)
+# 7. C# (.sln, .csproj, .cs files) - for completeness
+# 8. PHP (.php files)
+# 9. Ruby (Gemfile, .rb files)
+# 10. Swift (.swift files)
+# 11. Kotlin (.kt files)
+# 12. Scala (.scala files)
+# 13. Dart (pubspec.yaml, .dart files)
+# 14. R (.r files)
+# 15. Objective-C (.m files)
+# 16. Perl (.pl files)
+# 17. Lua (.lua files)
+# 18. Shell (.sh, .bash files)
+# 19. PowerShell (.ps1 files)
+# 20. Docker (Dockerfile)
+# 21. Documentation (.md, .txt, .rst files only)
+
+### UI Design Features:
+# - **Dark Theme**: Matches CodeAtlas application styling
+# - **Material Icons**: Error, warning, success, info icons
+# - **Backdrop Blur**: Modern glassmorphism effect
+# - **Slide Animation**: Smooth slide-in from right
+# - **Auto-dismiss**: 8 seconds for errors, 4-6 seconds for others
+# - **Manual Close**: X button in top right corner
+# - **Responsive**: Adapts to mobile screens
+# - **Code Styling**: Details section uses monospace font
+# - **Professional Look**: Rounded corners, subtle shadows, proper spacing
+
+### Key Improvements:
+# 1. **Much More Informative**: Instead of generic "no .sln found", shows exactly what was detected
+# 2. **Beautiful UI**: Professional toaster that matches the app design
+# 3. **Better UX**: Non-blocking notification that doesn't interfere with workflow
+# 4. **Educational**: Helps users understand what CodeAtlas expects vs what they provided
+# 5. **Comprehensive**: Detects 20+ popular programming languages and frameworks
+# 6. **Smart Detection**: Uses characteristic files to accurately identify repository types

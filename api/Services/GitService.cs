@@ -10,6 +10,7 @@ public interface IGitService
     int CountCSharpFiles(string repoPath);
     SolutionDiscoveryResult DiscoverSolutionOrProjects(string repoPath);
     string? GetCommitHash(string repoPath);
+    (List<string> detectedLanguages, List<string> foundFiles) DetectRepositoryDetails(string repoPath);
 }
 
 public class SolutionDiscoveryResult
@@ -493,8 +494,11 @@ public class GitService : IGitService
         }
     }
 
-    private string DetectRepositoryType(string repoPath)
+    public (List<string> detectedLanguages, List<string> foundFiles) DetectRepositoryDetails(string repoPath)
     {
+        var detectedLanguages = new List<string>();
+        var foundFiles = new List<string>();
+
         try
         {
             // Check for various project types by looking for characteristic files
@@ -511,56 +515,177 @@ public class GitService : IGitService
             if (allFiles.Contains("package.json") || allFiles.Contains("tsconfig.json") || 
                 extensions.Contains(".ts") || extensions.Contains(".js") || extensions.Contains(".tsx") || extensions.Contains(".jsx"))
             {
-                return "TypeScript/JavaScript";
+                detectedLanguages.Add("TypeScript/JavaScript");
+                var tsFiles = new List<string>();
+                if (allFiles.Contains("package.json")) tsFiles.Add("package.json");
+                if (allFiles.Contains("tsconfig.json")) tsFiles.Add("tsconfig.json");
+                if (extensions.Contains(".ts") || extensions.Contains(".tsx")) tsFiles.Add(".ts files");
+                if (extensions.Contains(".js") || extensions.Contains(".jsx")) tsFiles.Add(".js files");
+                if (tsFiles.Any()) foundFiles.Add(string.Join(", ", tsFiles.Take(1)));
             }
 
             // Python detection
             if (allFiles.Contains("requirements.txt") || allFiles.Contains("setup.py") || allFiles.Contains("pyproject.toml") ||
                 extensions.Contains(".py"))
             {
-                return "Python";
+                detectedLanguages.Add("Python");
+                if (allFiles.Contains("requirements.txt")) foundFiles.Add("requirements.txt");
+                else if (allFiles.Contains("setup.py")) foundFiles.Add("setup.py");
+                else if (allFiles.Contains("pyproject.toml")) foundFiles.Add("pyproject.toml");
+                else if (extensions.Contains(".py")) foundFiles.Add(".py files");
             }
 
             // Java detection
             if (allFiles.Contains("pom.xml") || allFiles.Contains("build.gradle") || extensions.Contains(".java"))
             {
-                return "Java";
+                detectedLanguages.Add("Java");
+                if (allFiles.Contains("pom.xml")) foundFiles.Add("pom.xml");
+                else if (allFiles.Contains("build.gradle")) foundFiles.Add("build.gradle");
+                else if (extensions.Contains(".java")) foundFiles.Add(".java files");
             }
 
             // Go detection
             if (allFiles.Contains("go.mod") || allFiles.Contains("go.sum") || extensions.Contains(".go"))
             {
-                return "Go";
+                detectedLanguages.Add("Go");
+                if (allFiles.Contains("go.mod")) foundFiles.Add("go.mod");
+                else if (allFiles.Contains("go.sum")) foundFiles.Add("go.sum");
+                else if (extensions.Contains(".go")) foundFiles.Add(".go files");
             }
 
             // Rust detection
             if (allFiles.Contains("cargo.toml") || extensions.Contains(".rs"))
             {
-                return "Rust";
+                detectedLanguages.Add("Rust");
+                if (allFiles.Contains("cargo.toml")) foundFiles.Add("Cargo.toml");
+                else if (extensions.Contains(".rs")) foundFiles.Add(".rs files");
             }
 
             // C++ detection
             if (allFiles.Contains("cmakelists.txt") || allFiles.Contains("makefile") || 
                 extensions.Contains(".cpp") || extensions.Contains(".cc") || extensions.Contains(".cxx") || extensions.Contains(".h") || extensions.Contains(".hpp"))
             {
-                return "C++";
+                detectedLanguages.Add("C++");
+                if (allFiles.Contains("cmakelists.txt")) foundFiles.Add("CMakeLists.txt");
+                else if (allFiles.Contains("makefile")) foundFiles.Add("Makefile");
+                else if (extensions.Contains(".cpp") || extensions.Contains(".cc") || extensions.Contains(".cxx")) foundFiles.Add(".cpp files");
+                else if (extensions.Contains(".h") || extensions.Contains(".hpp")) foundFiles.Add(".h files");
+            }
+
+            // C# detection (for completeness)
+            if (allFiles.Any(f => f.EndsWith(".sln")) || allFiles.Any(f => f.EndsWith(".csproj")) || extensions.Contains(".cs"))
+            {
+                detectedLanguages.Add("C#");
+                if (allFiles.Any(f => f.EndsWith(".sln"))) foundFiles.Add(".sln files");
+                else if (allFiles.Any(f => f.EndsWith(".csproj"))) foundFiles.Add(".csproj files");
+                else if (extensions.Contains(".cs")) foundFiles.Add(".cs files");
+            }
+
+            // Additional popular languages
+            if (extensions.Contains(".php"))
+            {
+                detectedLanguages.Add("PHP");
+                foundFiles.Add(".php files");
+            }
+
+            if (extensions.Contains(".rb") || allFiles.Contains("gemfile"))
+            {
+                detectedLanguages.Add("Ruby");
+                if (allFiles.Contains("gemfile")) foundFiles.Add("Gemfile");
+                else foundFiles.Add(".rb files");
+            }
+
+            if (extensions.Contains(".swift"))
+            {
+                detectedLanguages.Add("Swift");
+                foundFiles.Add(".swift files");
+            }
+
+            if (extensions.Contains(".kt") || extensions.Contains(".kts"))
+            {
+                detectedLanguages.Add("Kotlin");
+                foundFiles.Add(".kt files");
+            }
+
+            if (extensions.Contains(".scala"))
+            {
+                detectedLanguages.Add("Scala");
+                foundFiles.Add(".scala files");
+            }
+
+            if (extensions.Contains(".dart") || allFiles.Contains("pubspec.yaml"))
+            {
+                detectedLanguages.Add("Dart");
+                if (allFiles.Contains("pubspec.yaml")) foundFiles.Add("pubspec.yaml");
+                else foundFiles.Add(".dart files");
+            }
+
+            if (extensions.Contains(".r"))
+            {
+                detectedLanguages.Add("R");
+                foundFiles.Add(".r files");
+            }
+
+            if (extensions.Contains(".m") || extensions.Contains(".mm"))
+            {
+                detectedLanguages.Add("Objective-C");
+                foundFiles.Add(".m files");
+            }
+
+            if (extensions.Contains(".pl") || extensions.Contains(".pm"))
+            {
+                detectedLanguages.Add("Perl");
+                foundFiles.Add(".pl files");
+            }
+
+            if (extensions.Contains(".lua"))
+            {
+                detectedLanguages.Add("Lua");
+                foundFiles.Add(".lua files");
+            }
+
+            if (extensions.Contains(".sh") || extensions.Contains(".bash"))
+            {
+                detectedLanguages.Add("Shell");
+                foundFiles.Add("shell scripts");
+            }
+
+            if (extensions.Contains(".ps1"))
+            {
+                detectedLanguages.Add("PowerShell");
+                foundFiles.Add(".ps1 files");
+            }
+
+            if (allFiles.Contains("dockerfile") || allFiles.Any(f => f.StartsWith("dockerfile")))
+            {
+                detectedLanguages.Add("Docker");
+                foundFiles.Add("Dockerfile");
             }
 
             // Documentation repository detection
-            var codeExtensions = new[] { ".cs", ".ts", ".js", ".py", ".java", ".go", ".rs", ".cpp", ".c", ".h" };
+            var codeExtensions = new[] { ".cs", ".ts", ".js", ".py", ".java", ".go", ".rs", ".cpp", ".c", ".h", ".php", ".rb", ".swift", ".kt", ".scala", ".dart" };
             var hasCodeFiles = extensions.Any(ext => codeExtensions.Contains(ext));
             
             if (!hasCodeFiles && (extensions.Contains(".md") || extensions.Contains(".txt") || extensions.Contains(".rst")))
             {
-                return "Documentation";
+                detectedLanguages.Add("Documentation");
+                if (extensions.Contains(".md")) foundFiles.Add(".md files");
+                else if (extensions.Contains(".txt")) foundFiles.Add(".txt files");
+                else if (extensions.Contains(".rst")) foundFiles.Add(".rst files");
             }
 
-            return "Unknown";
+            return (detectedLanguages, foundFiles);
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Error detecting repository type for {RepoPath}", repoPath);
-            return "Unknown";
+            _logger.LogWarning(ex, "Error detecting repository details for {RepoPath}", repoPath);
+            return (new List<string> { "Unknown" }, new List<string> { "Unable to scan files" });
         }
+    }
+
+    private string DetectRepositoryType(string repoPath)
+    {
+        var (detectedLanguages, _) = DetectRepositoryDetails(repoPath);
+        return detectedLanguages.FirstOrDefault() ?? "Unknown";
     }
 }
