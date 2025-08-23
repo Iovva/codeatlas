@@ -26,7 +26,6 @@ export interface FilterState {
   imports: [CommonModule],
   template: `
     <div class="graph-canvas-container h-100">
-      <div>DEBUG: Component loaded, cy initialized: {{ !!cy }}</div>
       <div #cytoscapeContainer class="cytoscape-container h-100"></div>
     </div>
   `,
@@ -100,18 +99,23 @@ export class GraphCanvasComponent implements OnInit, OnDestroy, OnChanges {
         {
           selector: 'node',
           style: {
-            'background-color': '#2d3748',
-            'border-color': '#4a5568',
+            'background-color': '#4299e1',
+            'background-gradient-direction': 'to-bottom-right',
+            'background-gradient-stop-colors': ['#4299e1', '#2b77cb'],
+            'border-color': '#63b3ed',
             'border-width': 2,
             'label': 'data(label)',
-            'color': '#e2e8f0',
+            'color': '#ffffff',
             'text-valign': 'center',
             'text-halign': 'center',
-            'font-size': '12px',
+            'font-size': '14px',
             'font-family': 'Inter, sans-serif',
-            'width': 60,
+            'font-weight': 600,
+            'width': 80,
             'height': 60,
-            'shape': 'roundrectangle'
+            'shape': 'roundrectangle',
+            'text-outline-color': '#1a202c',
+            'text-outline-width': 1
           }
         },
         {
@@ -146,11 +150,13 @@ export class GraphCanvasComponent implements OnInit, OnDestroy, OnChanges {
         {
           selector: 'edge',
           style: {
-            'width': 2,
-            'line-color': '#4a5568',
-            'target-arrow-color': '#4a5568',
+            'width': 3,
+            'line-color': '#718096',
+            'target-arrow-color': '#718096',
             'target-arrow-shape': 'triangle',
-            'curve-style': 'bezier'
+            'arrow-scale': 1.2,
+            'curve-style': 'bezier',
+            'opacity': 0.8
           }
         },
         {
@@ -170,8 +176,8 @@ export class GraphCanvasComponent implements OnInit, OnDestroy, OnChanges {
       ],
       layout: { name: 'preset' },
       minZoom: 0.1,
-      maxZoom: 3,
-      wheelSensitivity: 0.2
+      maxZoom: 5,
+      wheelSensitivity: 0.8
     });
     
     // Set up event handlers

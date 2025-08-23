@@ -150,8 +150,16 @@
       </div>
 
       <!-- Graph Canvas -->
-      <div *ngIf="analysisResult && !isAnalyzing" style="border: 2px solid #00ff00; padding: 10px;">
-        <div>DEBUG: Analysis result exists, currentScope: {{ currentScope }}, nodes: {{ currentScope === 'namespace' ? analysisResult.graphs.namespace.nodes.length : analysisResult.graphs.file.nodes.length }}</div>
+      <div *ngIf="analysisResult && !isAnalyzing" style="position: relative; width: 100%; height: 100%;">
+        <!-- DEBUG INFO -->
+        <div style="position: absolute; top: 10px; left: 10px; background: rgba(0,0,0,0.8); color: white; padding: 10px; font-size: 12px; z-index: 1000; border-radius: 4px;">
+          <div>Analysis Result: {{ analysisResult ? 'true' : 'false' }}</div>
+          <div>Current Scope: {{ currentScope }}</div>
+          <div>Nodes: {{ analysisResult?.graphs?.namespace?.nodes?.length || 0 }}</div>
+          <div>Edges: {{ analysisResult?.graphs?.namespace?.edges?.length || 0 }}</div>
+          <div>Graph Area Visible: true</div>
+        </div>
+        
         <app-graph-canvas
           [analysisResult]="analysisResult"
           [currentScope]="currentScope"

@@ -237,13 +237,13 @@
 }
 
 .graph-area {
-  background-color: var(--bs-body-bg);
-  border: 1px solid var(--bs-border-color);
-  border-radius: 8px;
-  margin: 1rem;
+  background-color: transparent;
   position: relative;
   flex: 1;
-  min-height: 0;
+  min-height: 600px;
+  height: calc(100vh - 150px);
+  margin: 0;
+  padding: 0;
 }
 
 /* Placeholder States */
