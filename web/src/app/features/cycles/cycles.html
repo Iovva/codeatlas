@@ -12,12 +12,19 @@
 
   <!-- No data message -->
   <div class="empty-state" *ngIf="!cycles || cycles.length === 0">
-    <span class="material-icons">no_crash</span>
-    <h4>No cycles found</h4>
-    <p>Either no analysis has been performed or the codebase has no circular dependencies</p>
-    <button type="button" class="btn btn-primary" routerLink="/explorer">
+    <span class="material-icons">{{ analysisResult ? 'check_circle' : 'hourglass_empty' }}</span>
+    <h4>{{ analysisResult ? 'No cycles found' : 'No analysis data' }}</h4>
+    <p *ngIf="!analysisResult">No analysis has been performed yet</p>
+    <p *ngIf="analysisResult">✅ Great! This codebase has no circular dependencies - clean architecture!</p>
+    <button type="button" class="btn btn-primary" routerLink="/explorer" *ngIf="!analysisResult">
       Go to Explorer to analyze a repository
     </button>
+    <div *ngIf="analysisResult" class="mt-3">
+      <small class="text-muted">
+        Repository: {{ analysisResult.meta.repo }}<br>
+        {{ analysisResult.graphs.file.nodes.length }} files analyzed
+      </small>
+    </div>
   </div>
 
   <!-- Cycles table -->

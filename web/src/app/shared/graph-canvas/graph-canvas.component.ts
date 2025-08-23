@@ -26,6 +26,7 @@ export interface FilterState {
   imports: [CommonModule],
   template: `
     <div class="graph-canvas-container h-100">
+      <div>DEBUG: Component loaded, cy initialized: {{ !!cy }}</div>
       <div #cytoscapeContainer class="cytoscape-container h-100"></div>
     </div>
   `,
@@ -47,7 +48,7 @@ export class GraphCanvasComponent implements OnInit, OnDestroy, OnChanges {
   @Output() nodeSelected = new EventEmitter<SelectedNodeInfo | null>();
   @Output() filterStateChanged = new EventEmitter<FilterState>();
   
-  private cy: Core | null = null;
+  public cy: Core | null = null;
   private destroy$ = new Subject<void>();
   private layoutSubject = new Subject<void>();
   
@@ -74,7 +75,8 @@ export class GraphCanvasComponent implements OnInit, OnDestroy, OnChanges {
   
   ngOnChanges(changes: SimpleChanges): void {
     if (changes['analysisResult'] || changes['currentScope']) {
-      this.updateGraph();
+      // Wait for Cytoscape to be ready before updating
+      setTimeout(() => this.updateGraph(), 100);
     }
     
     if (changes['searchTerm']) {
@@ -87,6 +89,11 @@ export class GraphCanvasComponent implements OnInit, OnDestroy, OnChanges {
   }
   
   private initializeCytoscape(): void {
+    console.log('Initializing Cytoscape...', {
+      container: this.cytoscapeContainer?.nativeElement,
+      containerExists: !!this.cytoscapeContainer?.nativeElement
+    });
+    
     this.cy = cytoscape({
       container: this.cytoscapeContainer.nativeElement,
       style: [
@@ -182,9 +189,21 @@ export class GraphCanvasComponent implements OnInit, OnDestroy, OnChanges {
   }
   
   private updateGraph(): void {
+    console.log('updateGraph called', {
+      cy: !!this.cy,
+      analysisResult: !!this.analysisResult,
+      currentScope: this.currentScope
+    });
+    
     if (!this.cy || !this.analysisResult) return;
     
     const graphData = this.getCurrentGraphData();
+    console.log('Graph data:', {
+      graphData,
+      nodeCount: graphData?.nodes?.length,
+      edgeCount: graphData?.edges?.length
+    });
+    
     if (!graphData) return;
     
     // Clear existing elements

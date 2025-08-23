@@ -150,15 +150,17 @@
       </div>
 
       <!-- Graph Canvas -->
-      <app-graph-canvas
-        *ngIf="analysisResult && !isAnalyzing"
-        [analysisResult]="analysisResult"
-        [currentScope]="currentScope"
-        [searchTerm]="searchTerm"
-        [filterState]="filterState"
-        (nodeSelected)="onNodeSelected($event)"
-        (filterStateChanged)="onFilterStateChanged($event)">
-      </app-graph-canvas>
+      <div *ngIf="analysisResult && !isAnalyzing" style="border: 2px solid #00ff00; padding: 10px;">
+        <div>DEBUG: Analysis result exists, currentScope: {{ currentScope }}, nodes: {{ currentScope === 'namespace' ? analysisResult.graphs.namespace.nodes.length : analysisResult.graphs.file.nodes.length }}</div>
+        <app-graph-canvas
+          [analysisResult]="analysisResult"
+          [currentScope]="currentScope"
+          [searchTerm]="searchTerm"
+          [filterState]="filterState"
+          (nodeSelected)="onNodeSelected($event)"
+          (filterStateChanged)="onFilterStateChanged($event)">
+        </app-graph-canvas>
+      </div>
     </div>
   </div>
 

@@ -47,6 +47,13 @@ export class Explorer implements OnInit, OnDestroy {
       .pipe(takeUntil(this.destroy$))
       .subscribe(state => {
         this.currentState = state;
+        console.log('Explorer state updated:', {
+          hasAnalysisResult: !!state.analysisResult,
+          isAnalyzing: state.isAnalyzing,
+          currentScope: state.ui.currentScope,
+          namespaceNodes: state.analysisResult?.graphs?.namespace?.nodes?.length,
+          fileNodes: state.analysisResult?.graphs?.file?.nodes?.length
+        });
       });
   }
 
