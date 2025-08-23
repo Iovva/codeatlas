@@ -1,0 +1,79 @@
+### Test Step 10: Cycles (SCC) + Final Response Assembly
+
+# Test a repository with known circular dependencies to verify SCC detection
+POST http://localhost:5000/analyze
+Content-Type: application/json
+
+{
+  "repoUrl": "https://github.com/nunit/nunit.git"
+}
+
+### Test repository with complex structure to verify cycle detection (ASP.NET Core)
+POST http://localhost:5000/analyze
+Content-Type: application/json
+
+{
+  "repoUrl": "https://github.com/aspnet/AspNetCore.git"
+}
+
+### Test smaller repository to validate final response assembly (dotnet samples)
+POST http://localhost:5000/analyze
+Content-Type: application/json
+
+{
+  "repoUrl": "https://github.com/dotnet/samples.git"
+}
+
+### Test invalid repository (should return CloneFailed)
+POST http://localhost:5000/analyze
+Content-Type: application/json
+
+{
+  "repoUrl": "https://github.com/invalid/nonexistent-repo.git"
+}
+
+### Test repository with specific branch to verify commit hash detection
+POST http://localhost:5000/analyze
+Content-Type: application/json
+
+{
+  "repoUrl": "https://github.com/nunit/nunit.git",
+  "branch": "main"
+}
+
+###
+# WHAT'S DIFFERENT IN STEP 10:
+# 
+# 1. STRONGLY CONNECTED COMPONENTS (SCC) DETECTION: Using Tarjan's algorithm 
+#    to identify cycles in the file dependency graph. Only cycles with size >= 2
+#    are included in the response (actual cycles, not single-node components).
+#
+# 2. CYCLES SECTION: Complete cycles array with:
+#    - id: Unique identifier for each SCC
+#    - size: Number of files involved in the cycle
+#    - sample: Array of up to 5 file IDs showing which files are in the cycle
+#
+# 3. COMPLETE META SECTION: Enhanced meta section now includes:
+#    - repo: Repository URL
+#    - branch: Branch name (if specified)
+#    - commit: Git commit hash of the analyzed repository
+#    - generatedAt: UTC timestamp when analysis was performed
+#
+# 4. FINAL RESPONSE ASSEMBLY: All sections are now complete:
+#    - meta: Complete repository metadata with commit info
+#    - graphs: Both namespace and file graphs with nodes and edges
+#    - metrics: Counts, fan-in/out top lists, LOC data
+#    - cycles: SCC-detected circular dependencies
+#
+# 5. WHAT TO LOOK FOR:
+#    - Meta.commit: Should contain actual git commit hash (e.g., "a1b2c3d...")
+#    - Cycles array: Should contain entries where size >= 2 for repos with cycles
+#    - Response structure: Verify all four top-level keys are populated
+#    - SCC detection: Check that circular dependencies are properly identified
+#    - Performance: Entire analysis should complete within reasonable time
+#
+# 6. ARCHITECTURAL INSIGHT: Step 10 completes the core analysis pipeline by:
+#    - Detecting problematic circular dependencies that can cause build issues
+#    - Providing complete repository metadata for traceability
+#    - Assembling all analysis results into final response format
+#    - Enabling cycle-focused architectural review and refactoring

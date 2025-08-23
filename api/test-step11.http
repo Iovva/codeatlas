@@ -1,0 +1,126 @@
+### Step 11: Frontend Shell (Angular 20) + Routing + Theme
+### Tests the basic Angular frontend application with dark theme, routing, and toolbar
+
+### WHAT'S DIFFERENT IN STEP 11:
+### - This step focuses on FRONTEND rather than backend API
+### - Tests user interface components and navigation
+### - Validates PROFESSIONAL DARK THEME with custom CSS (no inline styles)
+### - Checks toolbar with all required controls (Git URL, Branch, Analyze, Scope toggle, Search, Export, Save/Load)
+### - Verifies routing between Explorer (default) and Cycles tabs
+### - Tests API integration for /analyze endpoint from frontend
+### - MINIMALIST DESIGN: Clean, modern interface with proper spacing and typography
+### - RESPONSIVE LAYOUT: Works on desktop, tablet, and mobile devices
+
+### Test 1: Backend API is still working (prerequisite for frontend testing)
+POST http://localhost:5000/analyze
+Content-Type: application/json
+
+{
+  "repoUrl": "https://github.com/nunit/nunit.git"
+}
+
+### Expected: HTTP 200 with complete analysis result (proves backend is ready for frontend)
+### This should return the full analysis with meta, graphs, metrics, and cycles
+
+### Test 2: Health check for backend connectivity
+GET http://localhost:5000/health
+
+### Expected: HTTP 200 with CodeAtlas health status
+### Frontend will connect to this API base URL
+
+### MANUAL FRONTEND TESTS (run these in browser after starting Angular dev server):
+
+### 1. Start the Angular development server:
+### cd codeatlas/web/codeatlas && npm start
+### Expected: Server starts on http://localhost:4200
+
+### 2. Open browser to http://localhost:4200
+### Expected: 
+### - Dark theme applied (dark background, light text)
+### - CodeAtlas navigation header with logo
+### - Explorer tab is active by default
+### - Cycles tab is visible and clickable
+
+### 3. Explorer Toolbar Validation
+### Check that the toolbar contains ALL required elements:
+### - Git URL input field with link icon
+### - Branch input field (optional) with fork icon  
+### - Analyze button with analytics icon
+### - Scope toggle (Namespace/File radio buttons) - default should be Namespace
+### - Search input field with search icon
+### - Export dropdown with PNG/SVG/JSON options
+### - Save button with save icon
+### - Load button with folder icon
+
+### 4. Dark Theme & Design Verification
+### Expected visual elements:
+### - MINIMALIST DARK THEME: Dark background (#1a1a1a), light text (#e0e0e0)
+### - PROFESSIONAL STYLING: No inline CSS, all styles in dedicated .css files
+### - CLEAN LAYOUT: Proper spacing, shadows, and visual hierarchy
+### - TYPOGRAPHY: Inter font for UI, JetBrains Mono for code elements
+### - ICONS: Material Icons properly integrated and styled
+### - RESPONSIVE: Adapts to different screen sizes gracefully
+### - ACCESSIBILITY: Good contrast ratios and hover states
+
+### 5. Navigation Testing
+### Click on "Cycles" tab
+### Expected: 
+### - URL changes to /cycles
+### - Cycles tab becomes active
+### - Shows "No cycles found" message with icon
+### - "Go to Explorer" button visible
+
+### Click on "Explorer" tab or CodeAtlas logo
+### Expected:
+### - URL changes to /explorer (or /)
+### - Explorer tab becomes active
+### - Shows the placeholder message "Enter a Git repository URL..."
+
+### 6. Functional Testing (Basic UI Interaction)
+### In Explorer view:
+### - Type in Git URL field: "https://github.com/nunit/nunit.git"
+### - Leave branch field empty
+### - Click "Analyze" button
+### Expected:
+### - Button changes to "Analyzing..." and becomes disabled
+### - Spinner shows with "Analyzing repository..." message
+### - After completion: shows "Analysis Complete!" with node/edge counts
+### - Console log shows the analysis result
+
+### 7. Error Handling Test
+### In Explorer view:
+### - Type invalid URL: "not-a-url"
+### - Click "Analyze" button  
+### Expected:
+### - Shows appropriate error message alert
+### - Button returns to normal state
+
+### 8. Scope Toggle Test
+### - Click between "Namespace" and "File" radio buttons
+### - Both should be selectable
+### - After successful analysis, node counts should change between scopes
+
+### 9. Export Functionality Test
+### After successful analysis:
+### - Click Export dropdown
+### - Click "JSON" option
+### Expected: File download with name pattern "codeatlas-{scope}-{date}.json"
+### - PNG and SVG show "will be implemented in Step 15" alert
+
+### 10. Save/Load Test
+### After successful analysis:
+### - Click "Save" button
+### Expected: Downloads JSON file (same as Export JSON)
+### - Click "Load" button  
+### Expected: File picker opens, accepts .json files
+
+### VALIDATION CRITERIA FOR STEP 11:
+### ✅ Angular app starts on port 4200 with no compilation errors
+### ✅ Dark theme is properly applied throughout the application
+### ✅ Navigation works between Explorer and Cycles tabs
+### ✅ Explorer toolbar contains all 8 required elements
+### ✅ API integration works - can call /analyze endpoint
+### ✅ Basic error handling shows appropriate messages
+### ✅ Bootstrap styling and Material Icons render correctly
+### ✅ Responsive design works on different screen sizes
+### ✅ All placeholder functionality shows appropriate "Step X" messages

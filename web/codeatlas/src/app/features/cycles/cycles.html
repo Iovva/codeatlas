@@ -1,0 +1,62 @@
+<!-- Cycles View -->
+<div class="cycles-container h-100">
+  <div class="cycles-header d-flex justify-content-between align-items-center">
+    <h3 class="d-flex align-items-center">
+      <span class="material-icons me-2">account_tree</span>
+      Dependency Cycles
+    </h3>
+    <small>
+      Strongly connected components with size ≥ 2
+    </small>
+  </div>
+
+  <!-- No data message -->
+  <div class="empty-state" *ngIf="!cycles || cycles.length === 0">
+    <span class="material-icons">no_crash</span>
+    <h4>No cycles found</h4>
+    <p>Either no analysis has been performed or the codebase has no circular dependencies</p>
+    <button type="button" class="btn btn-primary" routerLink="/explorer">
+      Go to Explorer to analyze a repository
+    </button>
+  </div>
+
+  <!-- Cycles table -->
+  <div class="table-responsive" *ngIf="cycles && cycles.length > 0">
+    <table class="table table-dark table-striped">
+      <thead>
+        <tr>
+          <th scope="col">ID</th>
+          <th scope="col">Size</th>
+          <th scope="col">Sample Files</th>
+          <th scope="col">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let cycle of cycles">
+          <td>{{ cycle.id }}</td>
+          <td>
+            <span class="badge bg-warning text-dark">{{ cycle.size }} files</span>
+          </td>
+          <td>
+            <div class="badge-container">
+              <span *ngFor="let file of cycle.sample" class="badge bg-secondary small">
+                {{ getFileName(file) }}
+              </span>
+              <span *ngIf="cycle.size > cycle.sample.length" class="badge bg-info small">
+                +{{ cycle.size - cycle.sample.length }} more
+              </span>
+            </div>
+          </td>
+          <td class="action-cell">
+            <button type="button" class="btn btn-sm btn-outline-primary" 
+                    (click)="viewCycle(cycle)" [disabled]="true">
+              <span class="material-icons me-1">visibility</span>
+              View
+            </button>
+            <small>Available in Step 13</small>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>

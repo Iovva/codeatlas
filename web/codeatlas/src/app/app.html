@@ -1,0 +1,37 @@
+<!-- CodeAtlas Application -->
+<div class="app-container">
+  <!-- Top navigation bar -->
+  <nav class="navbar navbar-dark">
+    <div class="container-fluid">
+      <a class="navbar-brand d-flex align-items-center" [routerLink]="['/explorer']">
+        <span class="material-icons me-2">hub</span>
+        <strong>CodeAtlas</strong>
+      </a>
+      
+      <!-- Navigation tabs -->
+      <ul class="nav nav-tabs border-0">
+        <li class="nav-item">
+          <a class="nav-link" 
+             [class.active]="router.url === '/explorer'" 
+             [routerLink]="['/explorer']">
+            <span class="material-icons me-1">explore</span>
+            Explorer
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" 
+             [class.active]="router.url === '/cycles'" 
+             [routerLink]="['/cycles']">
+            <span class="material-icons me-1">account_tree</span>
+            Cycles
+          </a>
+        </li>
+      </ul>
+    </div>
+  </nav>
+
+  <!-- Main content area -->
+  <div class="main-content">
+    <router-outlet />
+  </div>
+</div>

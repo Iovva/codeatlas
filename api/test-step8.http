@@ -1,0 +1,33 @@
+### Test Step 8: Namespace Aggregation + Node Identity
+
+# Test a repository with known namespace structure to verify namespace aggregation
+POST http://localhost:5000/analyze
+Content-Type: application/json
+
+{
+  "repoUrl": "https://github.com/dotnet/samples.git"
+}
+
+### Test repository with multiple namespaces (nunit)
+POST http://localhost:5000/analyze
+Content-Type: application/json
+
+{
+  "repoUrl": "https://github.com/nunit/nunit.git"
+}
+
+### Test invalid repository (should return CloneFailed)
+POST http://localhost:5000/analyze
+Content-Type: application/json
+
+{
+  "repoUrl": "https://github.com/invalid/nonexistent-repo.git"
+}
+
+### Test repository with deep namespace hierarchy (aspnetcore)
+POST http://localhost:5000/analyze
+Content-Type: application/json
+
+{
+  "repoUrl": "https://github.com/aspnet/AspNetCore.git"
+}

@@ -57,6 +57,16 @@ app.MapGet("/health", () =>
 .WithOpenApi();
 
 // POST /analyze endpoint with temp workspace and shallow clone
+// Helper function to generate top N metrics for nodes
+static List<Node> GenerateTopMetrics(IEnumerable<Node> nodes, Func<Node, int> selector, int topN)
+{
+    return nodes
+        .Where(n => selector(n) > 0) // Only include nodes with positive values
+        .OrderByDescending(selector)
+        .Take(topN)
+        .ToList();
+}
+
 app.MapPost("/analyze", async (AnalyzeRequest request, IGitService gitService, IRoslynAnalysisService roslynService, ILogger<Program> logger, CancellationToken cancellationToken) =>
 {
     string? tempPath = null;
@@ -118,6 +128,7 @@ app.MapPost("/analyze", async (AnalyzeRequest request, IGitService gitService, I
                 "MissingSdk" => 412,
                 "BuildFailed" => 424,
                 "LimitsExceeded" => 413,
+                "NoSuitableProjects" => 422, // Unprocessable Entity
                 _ => 500
             };
             
@@ -133,6 +144,23 @@ app.MapPost("/analyze", async (AnalyzeRequest request, IGitService gitService, I
         logger.LogInformation("Roslyn analysis completed successfully with {CompilationCount} compilations and {DependencyCount} dependencies", 
             analysisResult.Compilations.Count, analysisResult.Dependencies.Count);
         
+        // Step 10: Detect strongly connected components (cycles) in the file graph
+        var sccs = roslynService.DetectStronglyConnectedComponents(analysisResult.Dependencies);
+        var cycles = sccs
+            .Where(scc => scc.Size >= 2) // Only include actual cycles (size >= 2)
+            .Select(scc => new Cycle
+            {
+                Id = scc.Id,
+                Size = scc.Size,
+                Sample = scc.GetSample()
+            })
+            .ToList();
+        
+        logger.LogInformation("Detected {CycleCount} cycles from {SccCount} strongly connected components", cycles.Count, sccs.Count);
+        
+        // Get commit hash for the repository
+        var commitHash = gitService.GetCommitHash(tempPath);
+        
         // Step 7: Build file graph from extracted dependencies
         var fileNodes = new List<Node>();
         var fileEdges = new List<Edge>();
@@ -144,18 +172,29 @@ app.MapPost("/analyze", async (AnalyzeRequest request, IGitService gitService, I
             .OrderBy(f => f)
             .ToList();
             
+        // Step 9: Calculate fan-in and fan-out for file nodes
+        var fileFanIn = new Dictionary<string, int>();
+        var fileFanOut = new Dictionary<string, int>();
+        
+        foreach (var file in allFiles)
+        {
+            fileFanIn[file] = analysisResult.Dependencies.Count(d => d.ToFile == file);
+            fileFanOut[file] = analysisResult.Dependencies.Count(d => d.FromFile == file);
+        }
+            
         foreach (var file in allFiles)
         {
             var nodeId = $"File:{file}";
             var fileName = Path.GetFileName(file);
+            var loc = analysisResult.FileLinesOfCode.GetValueOrDefault(file, 0);
             
             fileNodes.Add(new Node
             {
                 Id = nodeId,
                 Label = fileName,
-                Loc = 0, // LOC calculation will be implemented in Step 9
-                FanIn = 0, // Fan-in calculation will be implemented in Step 9
-                FanOut = 0 // Fan-out calculation will be implemented in Step 9
+                Loc = loc,
+                FanIn = fileFanIn.GetValueOrDefault(file, 0),
+                FanOut = fileFanOut.GetValueOrDefault(file, 0)
             });
         }
         
@@ -169,21 +208,74 @@ app.MapPost("/analyze", async (AnalyzeRequest request, IGitService gitService, I
             });
         }
         
+        // Step 8: Build namespace graph with canonical IDs (Namespace:<Fully.Qualified.Name>)
+        var namespaceNodes = new List<Node>();
+        var namespaceEdges = new List<Edge>();
+        
+        // Create namespace nodes from unique namespaces
+        var allNamespaces = analysisResult.NamespaceDependencies
+            .SelectMany(d => new[] { d.FromNamespace, d.ToNamespace })
+            .Distinct()
+            .OrderBy(ns => ns)
+            .ToList();
+            
+        // Step 9: Calculate fan-in and fan-out for namespace nodes, and aggregate LOC
+        var namespaceFanIn = new Dictionary<string, int>();
+        var namespaceFanOut = new Dictionary<string, int>();
+        var namespaceLoc = new Dictionary<string, int>();
+        
+        foreach (var namespaceName in allNamespaces)
+        {
+            namespaceFanIn[namespaceName] = analysisResult.NamespaceDependencies.Count(d => d.ToNamespace == namespaceName);
+            namespaceFanOut[namespaceName] = analysisResult.NamespaceDependencies.Count(d => d.FromNamespace == namespaceName);
+            
+            // Aggregate LOC from all files in this namespace
+            var filesInNamespace = analysisResult.FileNamespaces
+                .Where(kvp => kvp.Value == namespaceName)
+                .Select(kvp => kvp.Key);
+            namespaceLoc[namespaceName] = filesInNamespace.Sum(file => analysisResult.FileLinesOfCode.GetValueOrDefault(file, 0));
+        }
+            
+        foreach (var namespaceName in allNamespaces)
+        {
+            var nodeId = $"Namespace:{namespaceName}";
+            var displayName = namespaceName == "<global>" ? "(global)" : namespaceName.Split('.').Last();
+            
+            namespaceNodes.Add(new Node
+            {
+                Id = nodeId,
+                Label = displayName,
+                Loc = namespaceLoc.GetValueOrDefault(namespaceName, 0),
+                FanIn = namespaceFanIn.GetValueOrDefault(namespaceName, 0),
+                FanOut = namespaceFanOut.GetValueOrDefault(namespaceName, 0)
+            });
+        }
+        
+        // Create namespace edges from dependencies
+        foreach (var dependency in analysisResult.NamespaceDependencies)
+        {
+            namespaceEdges.Add(new Edge
+            {
+                From = $"Namespace:{dependency.FromNamespace}",
+                To = $"Namespace:{dependency.ToNamespace}"
+            });
+        }
+        
         var response = new AnalyzeResponse
         {
             Meta = new Meta
             {
                 Repo = request.RepoUrl,
                 Branch = request.Branch,
-                Commit = null, // Will be populated when we implement git commit detection
+                Commit = commitHash,
                 GeneratedAt = DateTime.UtcNow
             },
             Graphs = new Graphs
             {
                 Namespace = new Graph
                 {
-                    Nodes = new List<Node>(), // Namespace aggregation will be implemented in Step 8
-                    Edges = new List<Edge>()
+                    Nodes = namespaceNodes,
+                    Edges = namespaceEdges
                 },
                 File = new Graph
                 {
@@ -195,14 +287,14 @@ app.MapPost("/analyze", async (AnalyzeRequest request, IGitService gitService, I
             {
                 Counts = new Counts
                 {
-                    NamespaceNodes = 0, // Will be populated in Step 8
+                    NamespaceNodes = namespaceNodes.Count,
                     FileNodes = fileNodes.Count,
-                    Edges = fileEdges.Count
+                    Edges = fileEdges.Count + namespaceEdges.Count
                 },
-                FanInTop = new List<Node>(), // Will be calculated in Step 9
-                FanOutTop = new List<Node>() // Will be calculated in Step 9
+                FanInTop = GenerateTopMetrics(fileNodes.Concat(namespaceNodes), n => n.FanIn, 5),
+                FanOutTop = GenerateTopMetrics(fileNodes.Concat(namespaceNodes), n => n.FanOut, 5)
             },
-            Cycles = new List<Cycle>() // Will be implemented in Step 10
+            Cycles = cycles
         };
         
         logger.LogInformation("Analysis completed successfully for repository: {RepoUrl}", request.RepoUrl);

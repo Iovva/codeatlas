@@ -9,6 +9,7 @@ public interface IGitService
     void CleanupTempDirectory(string tempPath);
     int CountCSharpFiles(string repoPath);
     SolutionDiscoveryResult DiscoverSolutionOrProjects(string repoPath);
+    string? GetCommitHash(string repoPath);
 }
 
 public class SolutionDiscoveryResult
@@ -428,6 +429,52 @@ public class GitService : IGitService
                 ErrorCode = "NoSolutionOrProject",
                 ErrorMessage = "No `.sln` or `.csproj` found in the repository. Provide a C# solution/project repo or specify a path to the `.sln`."
             };
+        }
+    }
+
+    public string? GetCommitHash(string repoPath)
+    {
+        try
+        {
+            _logger.LogDebug("Getting commit hash for repository: {RepoPath}", repoPath);
+            
+            var processInfo = new ProcessStartInfo
+            {
+                FileName = _gitPath,
+                Arguments = "rev-parse HEAD",
+                WorkingDirectory = repoPath,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+
+            using var process = Process.Start(processInfo);
+            if (process == null)
+            {
+                _logger.LogWarning("Failed to start git process for commit hash");
+                return null;
+            }
+
+            var output = process.StandardOutput.ReadToEnd().Trim();
+            var error = process.StandardError.ReadToEnd();
+            process.WaitForExit();
+
+            if (process.ExitCode == 0 && !string.IsNullOrEmpty(output))
+            {
+                _logger.LogDebug("Retrieved commit hash: {CommitHash}", output);
+                return output;
+            }
+            else
+            {
+                _logger.LogWarning("Failed to get commit hash. Exit code: {ExitCode}, Error: {Error}", process.ExitCode, error);
+                return null;
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting commit hash for repository: {RepoPath}", repoPath);
+            return null;
         }
     }
 }

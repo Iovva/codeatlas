@@ -1,0 +1,58 @@
+### Test Step 9: Metrics (LOC, Fan-In, Fan-Out, Counts)
+
+# Test a repository with known complexity to verify metrics calculation
+POST http://localhost:5000/analyze
+Content-Type: application/json
+
+{
+  "repoUrl": "https://github.com/nunit/nunit.git"
+}
+
+### Test repository with simpler structure (dotnet samples)
+POST http://localhost:5000/analyze
+Content-Type: application/json
+
+{
+  "repoUrl": "https://github.com/dotnet/samples.git"
+}
+
+### Test invalid repository (should return CloneFailed)
+POST http://localhost:5000/analyze
+Content-Type: application/json
+
+{
+  "repoUrl": "https://github.com/invalid/nonexistent-repo.git"
+}
+
+### Test large repository to verify performance (AspNetCore)
+POST http://localhost:5000/analyze
+Content-Type: application/json
+
+{
+  "repoUrl": "https://github.com/aspnet/AspNetCore.git"
+}
+
+###
+# WHAT'S DIFFERENT IN STEP 9:
+# 
+# 1. LOC CALCULATION: Each file node now has accurate lines-of-code count 
+#    excluding blank lines and comments (single-line //, multi-line /* */, 
+#    XML documentation /// comments)
+#
+# 2. FAN-IN/FAN-OUT METRICS: Both file and namespace nodes show:
+#    - FanIn: Number of distinct nodes that depend on this node
+#    - FanOut: Number of distinct nodes this node depends on
+#
+# 3. NAMESPACE LOC AGGREGATION: Namespace nodes aggregate LOC from all 
+#    files within that namespace for architectural insight
+#
+# 4. TOP-N LISTS: Metrics section includes:
+#    - fanInTop: Top 5 nodes (file + namespace) by highest fan-in
+#    - fanOutTop: Top 5 nodes (file + namespace) by highest fan-out
+#
+# 5. WHAT TO LOOK FOR:
+#    - File nodes: LOC > 0, reasonable fan-in/out values
+#    - Namespace nodes: LOC = sum of files, fan-in/out from aggregated dependencies  
+#    - Metrics.fanInTop: High-dependency nodes (heavily used)
+#    - Metrics.fanOutTop: Complex nodes (use many dependencies)
+#    - Verify top fan-in item has many incoming edges when visualized

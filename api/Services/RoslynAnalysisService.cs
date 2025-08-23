@@ -10,6 +10,7 @@ namespace CodeAtlas.Api.Services;
 public interface IRoslynAnalysisService
 {
     Task<RoslynAnalysisResult> AnalyzeAsync(string workspacePath, SolutionDiscoveryResult discoveryResult, CancellationToken cancellationToken = default);
+    List<StronglyConnectedComponent> DetectStronglyConnectedComponents(List<DependencyEdge> dependencies);
 }
 
 public class RoslynAnalysisService : IRoslynAnalysisService
@@ -40,12 +41,12 @@ public class RoslynAnalysisService : IRoslynAnalysisService
             
             if (!filteredProjects.Any())
             {
-                // If we have no projects after filtering, but we're in fallback mode, 
-                // create a minimal success result to allow Step 6 to complete
+                // Always return an error if no suitable projects are found
                 if (projectsToAnalyze.Count == 0)
                 {
-                    _logger.LogWarning("No projects could be loaded, but allowing Step 6 to complete with minimal validation");
-                    return RoslynAnalysisResult.CreateSuccess(new List<Compilation>(), new List<Project>(), new List<DependencyEdge>());
+                    _logger.LogError("No projects could be loaded from the repository");
+                    return RoslynAnalysisResult.CreateError("NoSuitableProjects", 
+                        "No C# projects could be loaded from the repository. The repository may not contain compatible project files or may have structural issues.");
                 }
                 
                 var sampleProjects = string.Join(", ", projectsToAnalyze.Take(5).Select(p => p.Name));
@@ -66,9 +67,10 @@ public class RoslynAnalysisService : IRoslynAnalysisService
             
             if (!compilations.Any())
             {
-                // If no compilations available, try to work with the project structure anyway
-                _logger.LogWarning("No compilations available, but continuing with project analysis");
-                return RoslynAnalysisResult.CreateSuccess(new List<Compilation>(), filteredProjects, new List<DependencyEdge>());
+                // If no compilations available, this indicates compilation failures
+                _logger.LogError("No compilations available - all projects failed to compile successfully");
+                return RoslynAnalysisResult.CreateError("BuildFailed", 
+                    $"All {filteredProjects.Count} projects failed to compile. This may be due to missing SDKs, incompatible target frameworks, or compilation errors. Check that the repository builds locally with the correct .NET SDK installed.");
             }
 
             _logger.LogInformation("Successfully compiled {ProjectCount} projects for analysis", compilations.Count);
@@ -84,7 +86,15 @@ public class RoslynAnalysisService : IRoslynAnalysisService
 
             _logger.LogInformation("Extracted {DependencyCount} file-to-file dependencies", dependencies.Count);
 
-            return RoslynAnalysisResult.CreateSuccess(compilations, filteredProjects, dependencies);
+            // Step 8: Extract namespace information and build namespace graph
+            var fileNamespaces = await ExtractFileNamespacesAsync(workspacePath, compilations, cancellationToken);
+            var namespaceDependencies = BuildNamespaceDependencies(dependencies, fileNamespaces);
+
+            // Step 9: Calculate lines of code for each file
+            var fileLinesOfCode = await CalculateLinesOfCodeAsync(workspacePath, compilations, cancellationToken);
+            _logger.LogInformation("Calculated LOC for {FileCount} files", fileLinesOfCode.Count);
+
+            return RoslynAnalysisResult.CreateSuccess(compilations, filteredProjects, dependencies, fileNamespaces, namespaceDependencies, fileLinesOfCode);
         }
         catch (Exception ex)
         {
@@ -481,7 +491,7 @@ public class RoslynAnalysisService : IRoslynAnalysisService
     }
 
     /// <summary>
-    /// Extract file-to-file dependencies from symbol references within the solution
+    /// Extract file-to-file dependencies and namespace information from symbol references within the solution
     /// </summary>
     private async Task<List<DependencyEdge>> ExtractDependenciesAsync(string workspacePath, List<Compilation> compilations, CancellationToken cancellationToken)
     {
@@ -642,6 +652,305 @@ public class RoslynAnalysisService : IRoslynAnalysisService
         var relativePath = Path.GetRelativePath(workspacePath, filePath);
         return relativePath.Replace('\\', '/'); // Use forward slashes as per specification
     }
+    
+    /// <summary>
+    /// Extract namespace information for each file in the compilations
+    /// </summary>
+    public async Task<Dictionary<string, string>> ExtractFileNamespacesAsync(string workspacePath, List<Compilation> compilations, CancellationToken cancellationToken = default)
+    {
+        _logger.LogInformation("Starting namespace extraction from {CompilationCount} compilations", compilations.Count);
+        
+        var fileNamespaces = new Dictionary<string, string>(); // relative file path -> namespace
+        
+        foreach (var compilation in compilations)
+        {
+            foreach (var syntaxTree in compilation.SyntaxTrees)
+            {
+                if (string.IsNullOrEmpty(syntaxTree.FilePath) || !File.Exists(syntaxTree.FilePath))
+                    continue;
+                    
+                var relativePath = GetRelativePath(workspacePath, syntaxTree.FilePath);
+                var root = await syntaxTree.GetRootAsync(cancellationToken);
+                
+                // Find the primary namespace for this file
+                var namespaceDeclaration = root.DescendantNodes()
+                    .OfType<NamespaceDeclarationSyntax>()
+                    .FirstOrDefault();
+                    
+                var fileScopedNamespace = root.DescendantNodes()
+                    .OfType<FileScopedNamespaceDeclarationSyntax>()
+                    .FirstOrDefault();
+                
+                string namespaceName;
+                if (fileScopedNamespace != null)
+                {
+                    namespaceName = fileScopedNamespace.Name.ToString();
+                }
+                else if (namespaceDeclaration != null)
+                {
+                    namespaceName = namespaceDeclaration.Name.ToString();
+                }
+                else
+                {
+                    // Fallback to global namespace
+                    namespaceName = "<global>";
+                }
+                
+                fileNamespaces[relativePath] = namespaceName;
+                _logger.LogDebug("File {File} assigned to namespace {Namespace}", relativePath, namespaceName);
+            }
+        }
+        
+        _logger.LogInformation("Extracted namespace information for {FileCount} files", fileNamespaces.Count);
+        return fileNamespaces;
+    }
+    
+    /// <summary>
+    /// Build namespace-level dependencies from file dependencies
+    /// </summary>
+    public List<NamespaceDependency> BuildNamespaceDependencies(List<DependencyEdge> fileDependencies, Dictionary<string, string> fileNamespaces)
+    {
+        _logger.LogInformation("Building namespace dependencies from {FileDependencyCount} file dependencies", fileDependencies.Count);
+        
+        var namespaceDependencies = new HashSet<NamespaceDependency>();
+        
+        foreach (var fileDep in fileDependencies)
+        {
+            // Get namespace for source and target files
+            if (fileNamespaces.TryGetValue(fileDep.FromFile, out var fromNamespace) &&
+                fileNamespaces.TryGetValue(fileDep.ToFile, out var toNamespace))
+            {
+                // Only add edge if namespaces are different or it's a self-reference within a namespace
+                if (fromNamespace != toNamespace || fromNamespace == toNamespace)
+                {
+                    namespaceDependencies.Add(new NamespaceDependency(fromNamespace, toNamespace));
+                }
+            }
+        }
+        
+        var result = namespaceDependencies.ToList();
+        _logger.LogInformation("Built {NamespaceDependencyCount} namespace dependencies", result.Count);
+        
+        return result;
+    }
+    
+    /// <summary>
+    /// Calculate lines of code for a file, excluding blank and comment lines
+    /// Step 9: LOC calculation requirement
+    /// </summary>
+    public async Task<Dictionary<string, int>> CalculateLinesOfCodeAsync(string workspacePath, List<Compilation> compilations, CancellationToken cancellationToken = default)
+    {
+        _logger.LogInformation("Calculating lines of code for files in {CompilationCount} compilations", compilations.Count);
+        
+        var locMap = new Dictionary<string, int>(); // relative file path -> LOC count
+        
+        foreach (var compilation in compilations)
+        {
+            foreach (var syntaxTree in compilation.SyntaxTrees)
+            {
+                if (string.IsNullOrEmpty(syntaxTree.FilePath) || !File.Exists(syntaxTree.FilePath))
+                    continue;
+                    
+                var relativePath = GetRelativePath(workspacePath, syntaxTree.FilePath);
+                var root = await syntaxTree.GetRootAsync(cancellationToken);
+                var sourceText = await syntaxTree.GetTextAsync(cancellationToken);
+                
+                var loc = CalculateNonBlankNonCommentLines(sourceText, root);
+                locMap[relativePath] = loc;
+                
+                _logger.LogDebug("File {File} has {LOC} lines of code", relativePath, loc);
+            }
+        }
+        
+        _logger.LogInformation("Calculated LOC for {FileCount} files", locMap.Count);
+        return locMap;
+    }
+    
+    /// <summary>
+    /// Calculate non-blank, non-comment lines for a source text
+    /// </summary>
+    private int CalculateNonBlankNonCommentLines(SourceText sourceText, SyntaxNode root)
+    {
+        var lineCount = 0;
+        var commentSpans = root.DescendantTrivia()
+            .Where(t => t.IsKind(SyntaxKind.SingleLineCommentTrivia) || 
+                       t.IsKind(SyntaxKind.MultiLineCommentTrivia) ||
+                       t.IsKind(SyntaxKind.SingleLineDocumentationCommentTrivia) ||
+                       t.IsKind(SyntaxKind.MultiLineDocumentationCommentTrivia))
+            .Select(t => t.Span)
+            .ToList();
+        
+        for (int i = 0; i < sourceText.Lines.Count; i++)
+        {
+            var line = sourceText.Lines[i];
+            var lineText = line.ToString().Trim();
+            
+            // Skip blank lines
+            if (string.IsNullOrWhiteSpace(lineText))
+                continue;
+                
+            // Check if the entire line is within a comment span
+            var lineSpan = line.Span;
+            var isCommentLine = commentSpans.Any(commentSpan => 
+                commentSpan.Contains(lineSpan) || 
+                (commentSpan.IntersectsWith(lineSpan) && IsLineFullyComment(lineText, commentSpan, lineSpan)));
+            
+            if (!isCommentLine)
+            {
+                lineCount++;
+            }
+        }
+        
+        return lineCount;
+    }
+    
+    /// <summary>
+    /// Check if a line is fully covered by a comment (allowing for edge cases)
+    /// </summary>
+    private bool IsLineFullyComment(string lineText, TextSpan commentSpan, TextSpan lineSpan)
+    {
+        // Simple heuristic: if line starts with // or /* or * (continuation), treat as comment
+        var trimmed = lineText.TrimStart();
+        return trimmed.StartsWith("//") || trimmed.StartsWith("/*") || trimmed.StartsWith("*");
+    }
+    
+    /// <summary>
+    /// Detect strongly connected components (SCCs) in the file dependency graph using Tarjan's algorithm
+    /// Step 10: Cycles (SCC) detection requirement
+    /// </summary>
+    public List<StronglyConnectedComponent> DetectStronglyConnectedComponents(List<DependencyEdge> dependencies)
+    {
+        _logger.LogInformation("Starting SCC detection on {EdgeCount} dependency edges", dependencies.Count);
+        
+        // Build adjacency list representation of the graph
+        var graph = new Dictionary<string, List<string>>();
+        var allNodes = new HashSet<string>();
+        
+        foreach (var edge in dependencies)
+        {
+            allNodes.Add(edge.FromFile);
+            allNodes.Add(edge.ToFile);
+            
+            if (!graph.ContainsKey(edge.FromFile))
+                graph[edge.FromFile] = new List<string>();
+            graph[edge.FromFile].Add(edge.ToFile);
+        }
+        
+        // Ensure all nodes are in the graph (even isolated ones)
+        foreach (var node in allNodes)
+        {
+            if (!graph.ContainsKey(node))
+                graph[node] = new List<string>();
+        }
+        
+        _logger.LogInformation("Built graph with {NodeCount} nodes for SCC analysis", allNodes.Count);
+        
+        // Run Tarjan's algorithm
+        var tarjan = new TarjanSccDetector(graph);
+        var sccs = tarjan.FindStronglyConnectedComponents();
+        
+        _logger.LogInformation("Found {SccCount} strongly connected components", sccs.Count);
+        
+        return sccs;
+    }
+}
+
+/// <summary>
+/// Represents a strongly connected component detected in the dependency graph
+/// </summary>
+public class StronglyConnectedComponent
+{
+    public int Id { get; set; }
+    public List<string> Files { get; set; } = new();
+    public int Size => Files.Count;
+    
+    /// <summary>
+    /// Get a sample of files for display (first few files in the component)
+    /// </summary>
+    public List<string> GetSample(int maxSamples = 5)
+    {
+        return Files.Take(maxSamples).Select(f => $"File:{f}").ToList();
+    }
+}
+
+/// <summary>
+/// Implementation of Tarjan's algorithm for strongly connected component detection
+/// </summary>
+public class TarjanSccDetector
+{
+    private readonly Dictionary<string, List<string>> _graph;
+    private readonly Dictionary<string, int> _index = new();
+    private readonly Dictionary<string, int> _lowLink = new();
+    private readonly HashSet<string> _onStack = new();
+    private readonly Stack<string> _stack = new();
+    private readonly List<StronglyConnectedComponent> _components = new();
+    private int _currentIndex = 0;
+    
+    public TarjanSccDetector(Dictionary<string, List<string>> graph)
+    {
+        _graph = graph;
+    }
+    
+    public List<StronglyConnectedComponent> FindStronglyConnectedComponents()
+    {
+        foreach (var node in _graph.Keys)
+        {
+            if (!_index.ContainsKey(node))
+            {
+                StrongConnect(node);
+            }
+        }
+        
+        return _components;
+    }
+    
+    private void StrongConnect(string node)
+    {
+        // Set the depth index for this node to the smallest unused index
+        _index[node] = _currentIndex;
+        _lowLink[node] = _currentIndex;
+        _currentIndex++;
+        _stack.Push(node);
+        _onStack.Add(node);
+        
+        // Consider successors of the node
+        if (_graph.ContainsKey(node))
+        {
+            foreach (var successor in _graph[node])
+            {
+                if (!_index.ContainsKey(successor))
+                {
+                    // Successor has not yet been visited; recurse on it
+                    StrongConnect(successor);
+                    _lowLink[node] = Math.Min(_lowLink[node], _lowLink[successor]);
+                }
+                else if (_onStack.Contains(successor))
+                {
+                    // Successor is in stack and hence in the current SCC
+                    _lowLink[node] = Math.Min(_lowLink[node], _index[successor]);
+                }
+            }
+        }
+        
+        // If this is a root node, pop the stack and create an SCC
+        if (_lowLink[node] == _index[node])
+        {
+            var component = new StronglyConnectedComponent
+            {
+                Id = _components.Count + 1
+            };
+            
+            string stackNode;
+            do
+            {
+                stackNode = _stack.Pop();
+                _onStack.Remove(stackNode);
+                component.Files.Add(stackNode);
+            } while (stackNode != node);
+            
+            _components.Add(component);
+        }
+    }
 }
 
 /// <summary>
@@ -681,6 +990,43 @@ public class DependencyEdge : IEquatable<DependencyEdge>
     }
 }
 
+/// <summary>
+/// Represents a dependency edge between two namespaces
+/// </summary>
+public class NamespaceDependency : IEquatable<NamespaceDependency>
+{
+    public string FromNamespace { get; }
+    public string ToNamespace { get; }
+    
+    public NamespaceDependency(string fromNamespace, string toNamespace)
+    {
+        FromNamespace = fromNamespace ?? throw new ArgumentNullException(nameof(fromNamespace));
+        ToNamespace = toNamespace ?? throw new ArgumentNullException(nameof(toNamespace));
+    }
+    
+    public bool Equals(NamespaceDependency? other)
+    {
+        if (other is null) return false;
+        if (ReferenceEquals(this, other)) return true;
+        return FromNamespace == other.FromNamespace && ToNamespace == other.ToNamespace;
+    }
+    
+    public override bool Equals(object? obj)
+    {
+        return Equals(obj as NamespaceDependency);
+    }
+    
+    public override int GetHashCode()
+    {
+        return HashCode.Combine(FromNamespace, ToNamespace);
+    }
+    
+    public override string ToString()
+    {
+        return $"{FromNamespace} -> {ToNamespace}";
+    }
+}
+
 public class RoslynAnalysisResult
 {
     public bool Success { get; init; }
@@ -689,15 +1035,21 @@ public class RoslynAnalysisResult
     public List<Compilation> Compilations { get; init; } = new();
     public List<Project> Projects { get; init; } = new();
     public List<DependencyEdge> Dependencies { get; init; } = new();
+    public Dictionary<string, string> FileNamespaces { get; init; } = new();
+    public List<NamespaceDependency> NamespaceDependencies { get; init; } = new();
+    public Dictionary<string, int> FileLinesOfCode { get; init; } = new();
 
-    public static RoslynAnalysisResult CreateSuccess(List<Compilation> compilations, List<Project> projects, List<DependencyEdge> dependencies)
+    public static RoslynAnalysisResult CreateSuccess(List<Compilation> compilations, List<Project> projects, List<DependencyEdge> dependencies, Dictionary<string, string> fileNamespaces, List<NamespaceDependency> namespaceDependencies, Dictionary<string, int> fileLinesOfCode)
     {
         return new RoslynAnalysisResult
         {
             Success = true,
             Compilations = compilations,
             Projects = projects,
-            Dependencies = dependencies
+            Dependencies = dependencies,
+            FileNamespaces = fileNamespaces,
+            NamespaceDependencies = namespaceDependencies,
+            FileLinesOfCode = fileLinesOfCode
         };
     }
 
@@ -708,7 +1060,10 @@ public class RoslynAnalysisResult
             Success = false,
             ErrorCode = code,
             ErrorMessage = message,
-            Dependencies = new List<DependencyEdge>()
+            Dependencies = new List<DependencyEdge>(),
+            FileNamespaces = new Dictionary<string, string>(),
+            NamespaceDependencies = new List<NamespaceDependency>(),
+            FileLinesOfCode = new Dictionary<string, int>()
         };
     }
 }

@@ -1,0 +1,82 @@
+/* CodeAtlas Global Styles - Dark Theme */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500&display=swap');
+@import url('https://fonts.googleapis.com/icon?family=Material+Icons');
+@import 'bootstrap/dist/css/bootstrap.min.css';
+
+/* Dark theme variables */
+:root {
+  --bs-body-bg: #1a1a1a;
+  --bs-body-color: #e0e0e0;
+  --bs-border-color: #333;
+  --bs-secondary-bg: #2d2d30;
+  --bs-tertiary-bg: #252526;
+}
+
+body {
+  font-family: 'Inter', sans-serif;
+  background-color: var(--bs-body-bg) !important;
+  color: var(--bs-body-color) !important;
+  margin: 0;
+  padding: 0;
+}
+
+code, pre {
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* Bootstrap dark theme overrides */
+.navbar-dark {
+  background-color: var(--bs-secondary-bg) !important;
+  border-bottom: 1px solid var(--bs-border-color);
+}
+
+.btn-primary {
+  background-color: #0d6efd;
+  border-color: #0d6efd;
+}
+
+.btn-outline-secondary {
+  color: #6c757d;
+  border-color: #6c757d;
+}
+
+.btn-outline-secondary:hover {
+  background-color: #6c757d;
+  color: #fff;
+}
+
+.form-control {
+  background-color: var(--bs-tertiary-bg);
+  border-color: var(--bs-border-color);
+  color: var(--bs-body-color);
+}
+
+.form-control:focus {
+  background-color: var(--bs-tertiary-bg);
+  border-color: #0d6efd;
+  color: var(--bs-body-color);
+  box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+}
+
+/* Material Icons dark theme */
+.material-icons {
+  color: var(--bs-body-color);
+}
+
+/* App-specific styles */
+.app-container {
+  height: 100vh;
+  overflow: hidden;
+}
+
+.toolbar {
+  background-color: var(--bs-secondary-bg);
+  border-bottom: 1px solid var(--bs-border-color);
+  padding: 0.75rem 1rem;
+}
+
+.main-content {
+  height: calc(100vh - 80px); /* Adjust based on toolbar height */
+  overflow: hidden;
+}
