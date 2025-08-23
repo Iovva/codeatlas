@@ -25,7 +25,7 @@ export interface TreeNode {
                 [class.invisible]="node.children.length === 0"
                 (click)="toggleNode()">
           <span class="material-icons">
-            {{ node.isExpanded ? 'expand_more' : 'chevron_right' }}
+            {{ node.isExpanded ? 'remove' : 'add' }}
           </span>
         </button>
         
@@ -103,7 +103,7 @@ export interface TreeNode {
     .form-check-label {
       display: flex;
       align-items: center;
-      color: #e2e8f0;
+      color: #ffffff;
       font-size: 0.875rem;
       margin: 0;
       cursor: pointer;
@@ -114,7 +114,7 @@ export interface TreeNode {
     }
     
     .node-count {
-      color: #a0aec0;
+      color: #ffffff;
       font-size: 0.75rem;
       margin-left: 0.25rem;
     }
@@ -163,20 +163,20 @@ export class TreeNodeComponent {
           {{ currentScope === 'namespace' ? 'Namespaces' : 'Folders' }}
         </h6>
         <div class="tree-actions">
-          <button type="button" class="btn btn-sm btn-outline-secondary"
+          <button type="button" class="btn btn-sm btn-outline-secondary tree-action-btn"
                   (click)="expandAll()" title="Expand All">
-            <span class="material-icons">unfold_more</span>
+            <span class="material-icons">expand_more</span>
           </button>
-          <button type="button" class="btn btn-sm btn-outline-secondary"
+          <button type="button" class="btn btn-sm btn-outline-secondary tree-action-btn"
                   (click)="collapseAll()" title="Collapse All">
-            <span class="material-icons">unfold_less</span>
+            <span class="material-icons">expand_less</span>
           </button>
         </div>
       </div>
       
       <div class="tree-content">
         <div class="tree-stats">
-          <small class="text-muted">
+          <small class="tree-stats-text">
             {{ getVisibleNodeCount() }} of {{ getTotalNodeCount() }} visible
           </small>
         </div>
@@ -287,6 +287,9 @@ export class FilterTreeComponent implements OnChanges {
       });
     });
     
+    // Propagate node IDs up the tree
+    this.propagateNodeIds(this.rootNodes);
+    
     // Sort children alphabetically
     this.sortTreeNodes(this.rootNodes);
   }
@@ -393,42 +396,59 @@ export class FilterTreeComponent implements OnChanges {
   }
   
   private updateCheckStates(): void {
-    this.updateNodeCheckStates(this.rootNodes);
+    // Initialize all nodes to visible (checked) from hidden nodes
+    this.syncCheckboxStatesFromHiddenNodes(this.rootNodes);
+    // Update visual states (indeterminate) based on checkbox states
+    this.updateVisualStates(this.rootNodes);
   }
   
-  private updateNodeCheckStates(nodes: TreeNode[]): void {
+  /**
+   * Synchronizes checkbox states based on the hiddenNodes set.
+   * This is the authoritative source of visibility state.
+   */
+  private syncCheckboxStatesFromHiddenNodes(nodes: TreeNode[]): void {
     nodes.forEach(node => {
       if (node.children.length > 0) {
-        this.updateNodeCheckStates(node.children);
+        // First sync children
+        this.syncCheckboxStatesFromHiddenNodes(node.children);
         
-        // Update parent state based on children
+        // For parent nodes, check if ALL children are unchecked
+        const allChildrenUnchecked = node.children.every(child => !child.isChecked);
+        
+        // Parent is checked if it's not explicitly hidden AND not all children are unchecked
+        node.isChecked = !this.hiddenNodes.has(node.id) && !allChildrenUnchecked;
+      } else {
+        // Leaf node - checked if none of its node IDs are hidden
+        const hasHiddenNodes = Array.from(node.nodeIds).some(id => this.hiddenNodes.has(id));
+        node.isChecked = !hasHiddenNodes;
+      }
+    });
+  }
+  
+  /**
+   * Updates only visual states (isIndeterminate) without changing isChecked values.
+   * This provides visual feedback about mixed child states.
+   */
+  private updateVisualStates(nodes: TreeNode[]): void {
+    nodes.forEach(node => {
+      if (node.children.length > 0) {
+        // First update children visual states
+        this.updateVisualStates(node.children);
+        
+        // Calculate visual state based on children
         const checkedChildren = node.children.filter(child => child.isChecked);
         const indeterminateChildren = node.children.filter(child => child.isIndeterminate);
         
-        if (checkedChildren.length === node.children.length) {
-          node.isChecked = true;
-          node.isIndeterminate = false;
-        } else if (checkedChildren.length === 0 && indeterminateChildren.length === 0) {
-          node.isChecked = false;
-          node.isIndeterminate = false;
+        if (node.isChecked) {
+          // Parent is checked - show indeterminate if some children are unchecked
+          node.isIndeterminate = checkedChildren.length < node.children.length;
         } else {
-          node.isChecked = false;
-          node.isIndeterminate = true;
+          // Parent is unchecked - never show indeterminate
+          node.isIndeterminate = false;
         }
       } else {
-        // Leaf node - check if any of its node IDs are hidden
-        const hiddenCount = Array.from(node.nodeIds).filter(id => this.hiddenNodes.has(id)).length;
-        
-        if (hiddenCount === 0) {
-          node.isChecked = true;
-          node.isIndeterminate = false;
-        } else if (hiddenCount === node.nodeIds.size) {
-          node.isChecked = false;
-          node.isIndeterminate = false;
-        } else {
-          node.isChecked = false;
-          node.isIndeterminate = true;
-        }
+        // Leaf nodes are never indeterminate
+        node.isIndeterminate = false;
       }
     });
   }
@@ -440,46 +460,109 @@ export class FilterTreeComponent implements OnChanges {
   onNodeChecked(event: { node: TreeNode, checked: boolean }): void {
     const { node, checked } = event;
     
-    // Update the node and all its children
-    this.setNodeChecked(node, checked);
+    console.log(`🔄 Checkbox changed: ${node.label} (${node.id}) → ${checked}`);
+    console.log(`📋 Before change - Hidden nodes:`, Array.from(this.hiddenNodes));
     
-    // Create new hidden nodes set
+    // Create new hidden nodes set starting from current state
     const newHiddenNodes = new Set(this.hiddenNodes);
     
-    // Update hidden nodes based on check states
-    this.collectHiddenNodes(this.rootNodes, newHiddenNodes);
+    if (node.children.length > 0) {
+      // PARENT NODE ACTION
+      console.log(`🔧 Parent node action - ${checked ? 'checking' : 'unchecking'} parent and all children`);
+      
+      if (checked) {
+        // Checking parent → show parent + all children
+        newHiddenNodes.delete(node.id);
+        this.getAllChildNodeIds(node).forEach(id => newHiddenNodes.delete(id));
+      } else {
+        // Unchecking parent → hide parent + all children
+        newHiddenNodes.add(node.id);
+        this.getAllChildNodeIds(node).forEach(id => newHiddenNodes.add(id));
+      }
+    } else {
+      // CHILD NODE ACTION (leaf or non-parent)
+      console.log(`🔧 Child node action - ${checked ? 'showing' : 'hiding'} only this node`);
+      
+      if (checked) {
+        // Checking child → show child + check if parent should be visible
+        newHiddenNodes.delete(node.id);
+        
+        // If parent exists and is unchecked, make parent visible too
+        const parent = this.findParentNode(node, this.rootNodes);
+        if (parent && newHiddenNodes.has(parent.id)) {
+          newHiddenNodes.delete(parent.id);
+          console.log(`🔧 Making parent ${parent.label} visible because child was checked`);
+        }
+      } else {
+        // Unchecking child → hide only this child, never change parent
+        newHiddenNodes.add(node.id);
+      }
+    }
     
-    // Emit the changes
+    console.log(`📋 After change - Hidden nodes:`, Array.from(newHiddenNodes));
+    console.log(`🎯 Difference:`, {
+      added: Array.from(newHiddenNodes).filter(id => !this.hiddenNodes.has(id)),
+      removed: Array.from(this.hiddenNodes).filter(id => !newHiddenNodes.has(id))
+    });
+    
+    // Emit the changes - the parent component will update hiddenNodes and trigger ngOnChanges
     this.nodesVisibilityChanged.emit(newHiddenNodes);
   }
   
-  private setNodeChecked(node: TreeNode, checked: boolean): void {
-    node.isChecked = checked;
-    node.isIndeterminate = false;
+  /**
+   * Gets all node IDs that belong to this tree node and its descendants.
+   * Used for parent actions that affect all children.
+   */
+  private getAllChildNodeIds(node: TreeNode): string[] {
+    const nodeIds: string[] = [];
     
-    // Update all children recursively
+    // Add this node's ID if it represents an actual graph node
+    if (node.nodeIds.size > 0) {
+      nodeIds.push(...Array.from(node.nodeIds));
+    }
+    
+    // Add all children's node IDs
     node.children.forEach(child => {
-      this.setNodeChecked(child, checked);
+      nodeIds.push(...this.getAllChildNodeIds(child));
     });
+    
+    return nodeIds;
   }
   
-  private collectHiddenNodes(nodes: TreeNode[], hiddenNodes: Set<string>): void {
-    nodes.forEach(node => {
-      if (!node.isChecked && !node.isIndeterminate) {
-        // Node is unchecked - hide all its node IDs
-        node.nodeIds.forEach(nodeId => {
-          hiddenNodes.add(nodeId);
-        });
-      } else if (node.isChecked && !node.isIndeterminate) {
-        // Node is fully checked - show all its node IDs
-        node.nodeIds.forEach(nodeId => {
-          hiddenNodes.delete(nodeId);
-        });
-      } else if (node.children.length > 0) {
-        // Node is indeterminate - recurse to children
-        this.collectHiddenNodes(node.children, hiddenNodes);
+  /**
+   * Finds the parent tree node of the given node.
+   * Used for child actions that might need to make parent visible.
+   */
+  private findParentNode(targetNode: TreeNode, nodes: TreeNode[]): TreeNode | null {
+    for (const node of nodes) {
+      // Check if this node is the direct parent
+      if (node.children.includes(targetNode)) {
+        return node;
       }
+      
+      // Recursively search in children
+      const parent = this.findParentNode(targetNode, node.children);
+      if (parent) {
+        return parent;
+      }
+    }
+    
+    return null;
+  }
+  
+  private getOwnNodeIds(node: TreeNode): string[] {
+    if (node.children.length === 0) {
+      // Leaf node - all nodeIds belong to it
+      return Array.from(node.nodeIds);
+    }
+    
+    // Parent node - find nodeIds that don't belong to any child
+    const childNodeIds = new Set<string>();
+    node.children.forEach(child => {
+      child.nodeIds.forEach(id => childNodeIds.add(id));
     });
+    
+    return Array.from(node.nodeIds).filter(id => !childNodeIds.has(id));
   }
   
   expandAll(): void {

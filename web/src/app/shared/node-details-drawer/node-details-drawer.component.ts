@@ -58,6 +58,21 @@ import { SelectedNodeInfo } from '../graph-canvas/graph-canvas.component';
           <small class="detail-help">Number of nodes this node depends on</small>
         </div>
         
+        <!-- Neighbors Only Toggle -->
+        <div class="detail-section">
+          <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" 
+                   [checked]="neighborsOnly"
+                   (change)="onNeighborsOnlyToggle()"
+                   id="neighborsOnlyDrawerSwitch">
+            <label class="form-check-label" for="neighborsOnlyDrawerSwitch">
+              <span class="material-icons me-1">hub</span>
+              Show neighbors only
+            </label>
+          </div>
+          <small class="detail-help">Show only this node and its immediate neighbors</small>
+        </div>
+        
         <!-- Actions -->
         <div class="detail-actions">
           <button type="button" class="btn btn-outline-primary btn-sm w-100 mb-2"
@@ -86,9 +101,11 @@ import { SelectedNodeInfo } from '../graph-canvas/graph-canvas.component';
 })
 export class NodeDetailsDrawerComponent implements OnChanges {
   @Input() selectedNode: SelectedNodeInfo | null = null;
+  @Input() neighborsOnly: boolean = false;
   @Output() closeRequested = new EventEmitter<void>();
   @Output() impactRequested = new EventEmitter<string>();
   @Output() pathsRequested = new EventEmitter<string>();
+  @Output() neighborsOnlyToggled = new EventEmitter<boolean>();
   
   ngOnChanges(changes: SimpleChanges): void {
     // Component will automatically update when selectedNode changes
@@ -108,6 +125,10 @@ export class NodeDetailsDrawerComponent implements OnChanges {
     if (this.selectedNode) {
       this.pathsRequested.emit(this.selectedNode.id);
     }
+  }
+  
+  onNeighborsOnlyToggle(): void {
+    this.neighborsOnlyToggled.emit(!this.neighborsOnly);
   }
   
   formatNumber(value: number): string {

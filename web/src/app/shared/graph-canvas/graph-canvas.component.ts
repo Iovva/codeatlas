@@ -27,6 +27,12 @@ export interface FilterState {
   template: `
     <div class="graph-canvas-container h-100">
       <div #cytoscapeContainer class="cytoscape-container h-100"></div>
+      
+      <!-- Zoom Level Meter -->
+      <div class="zoom-meter" *ngIf="cy">
+        <span class="zoom-label">Zoom:</span>
+        <span class="zoom-value">{{ getZoomLevel() }}%</span>
+      </div>
     </div>
   `,
   styleUrls: ['./graph-canvas.component.css']
@@ -466,5 +472,10 @@ export class GraphCanvasComponent implements OnInit, OnDestroy, OnChanges {
     // SVG export not available in this Cytoscape version
     // Will be implemented in Step 15 with proper export functionality
     return null;
+  }
+  
+  getZoomLevel(): number {
+    if (!this.cy) return 100;
+    return Math.round(this.cy.zoom() * 100);
   }
 }

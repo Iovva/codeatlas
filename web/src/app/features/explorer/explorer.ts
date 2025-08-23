@@ -238,4 +238,27 @@ export class Explorer implements OnInit, OnDestroy {
       neighborsOnly: !this.filterState.neighborsOnly
     };
   }
+  
+  onNeighborsOnlyToggled(enabled: boolean): void {
+    this.filterState = {
+      ...this.filterState,
+      neighborsOnly: enabled
+    };
+  }
+  
+  getNodeCount(): number {
+    if (!this.analysisResult) return 0;
+    const graphData = this.currentScope === 'namespace' 
+      ? this.analysisResult.graphs.namespace 
+      : this.analysisResult.graphs.file;
+    return graphData?.nodes?.length || 0;
+  }
+  
+  getEdgeCount(): number {
+    if (!this.analysisResult) return 0;
+    const graphData = this.currentScope === 'namespace' 
+      ? this.analysisResult.graphs.namespace 
+      : this.analysisResult.graphs.file;
+    return graphData?.edges?.length || 0;
+  }
 }

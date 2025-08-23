@@ -60,17 +60,7 @@
                [value]="searchTerm" (input)="onSearchChange(($any($event.target)).value)">
       </div>
 
-      <!-- Neighbors Only Toggle -->
-      <div class="form-check form-switch neighbors-toggle" *ngIf="selectedNode">
-        <input class="form-check-input" type="checkbox" 
-               [checked]="filterState.neighborsOnly"
-               (change)="toggleNeighborsOnly()"
-               id="neighborsOnlySwitch">
-        <label class="form-check-label" for="neighborsOnlySwitch">
-          <span class="material-icons me-1">hub</span>
-          Neighbors Only
-        </label>
-      </div>
+
     </div>
 
     <!-- Right Section: Export, Save/Load -->
@@ -151,13 +141,24 @@
 
       <!-- Graph Canvas -->
       <div *ngIf="analysisResult && !isAnalyzing" style="position: relative; width: 100%; height: 100%;">
-        <!-- DEBUG INFO -->
-        <div style="position: absolute; top: 10px; left: 10px; background: rgba(0,0,0,0.8); color: white; padding: 10px; font-size: 12px; z-index: 1000; border-radius: 4px;">
-          <div>Analysis Result: {{ analysisResult ? 'true' : 'false' }}</div>
-          <div>Current Scope: {{ currentScope }}</div>
-          <div>Nodes: {{ analysisResult?.graphs?.namespace?.nodes?.length || 0 }}</div>
-          <div>Edges: {{ analysisResult?.graphs?.namespace?.edges?.length || 0 }}</div>
-          <div>Graph Area Visible: true</div>
+        <!-- Graph Info Panel -->
+        <div class="graph-info-panel">
+          <div class="info-item">
+            <span class="info-label">Nodes:</span>
+            <span class="info-value">{{ getNodeCount() }}</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">Edges:</span>
+            <span class="info-value">{{ getEdgeCount() }}</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">Scope:</span>
+            <span class="info-value">{{ currentScope }}</span>
+          </div>
+          <div class="info-item" *ngIf="selectedNode">
+            <span class="info-label">Selected:</span>
+            <span class="info-value">{{ selectedNode.label }}</span>
+          </div>
         </div>
         
         <app-graph-canvas
@@ -175,8 +176,10 @@
   <!-- Right Drawer -->
   <app-node-details-drawer
     [selectedNode]="selectedNode"
+    [neighborsOnly]="filterState.neighborsOnly"
     (closeRequested)="onCloseDrawer()"
     (impactRequested)="onImpactRequested($event)"
-    (pathsRequested)="onPathsRequested($event)">
+    (pathsRequested)="onPathsRequested($event)"
+    (neighborsOnlyToggled)="onNeighborsOnlyToggled($event)">
   </app-node-details-drawer>
 </div>
