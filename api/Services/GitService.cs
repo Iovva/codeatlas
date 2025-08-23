@@ -343,7 +343,7 @@ public class GitService : IGitService
             {
                 Success = false,
                 ErrorCode = "NoSolutionOrProject",
-                ErrorMessage = "No `.sln` or `.csproj` found in the repository. Provide a C# solution/project repo or specify a path to the `.sln`."
+                ErrorMessage = "Repository path does not exist after cloning."
             };
         }
 
@@ -411,13 +411,28 @@ public class GitService : IGitService
                 };
             }
 
-            // Step 4: No .sln or .csproj found
+            // Step 4: No .sln or .csproj found - detect what type of repository this actually is
             _logger.LogWarning("No .sln or .csproj files found in repository: {RepoPath}", repoPath);
+            
+            // Detect what type of repository this might be
+            var detectedType = DetectRepositoryType(repoPath);
+            var specificMessage = detectedType switch
+            {
+                "TypeScript/JavaScript" => $"This appears to be a TypeScript/JavaScript repository (found package.json, tsconfig.json, or .js/.ts files). CodeAtlas only analyzes C# repositories with .sln or .csproj files.",
+                "Python" => $"This appears to be a Python repository (found .py files or requirements.txt). CodeAtlas only analyzes C# repositories with .sln or .csproj files.",
+                "Java" => $"This appears to be a Java repository (found .java files or pom.xml). CodeAtlas only analyzes C# repositories with .sln or .csproj files.",
+                "Go" => $"This appears to be a Go repository (found .go files or go.mod). CodeAtlas only analyzes C# repositories with .sln or .csproj files.",
+                "Rust" => $"This appears to be a Rust repository (found .rs files or Cargo.toml). CodeAtlas only analyzes C# repositories with .sln or .csproj files.",
+                "C++" => $"This appears to be a C++ repository (found .cpp/.h files or CMakeLists.txt). CodeAtlas only analyzes C# repositories with .sln or .csproj files.",
+                "Documentation" => $"This appears to be a documentation repository (found only .md, .txt, or config files). CodeAtlas requires C# repositories with .sln or .csproj files.",
+                _ => "No C# solution (.sln) or project (.csproj) files found. CodeAtlas requires a C# repository with compilable projects."
+            };
+            
             return new SolutionDiscoveryResult
             {
                 Success = false,
                 ErrorCode = "NoSolutionOrProject",
-                ErrorMessage = "No `.sln` or `.csproj` found in the repository. Provide a C# solution/project repo or specify a path to the `.sln`."
+                ErrorMessage = specificMessage
             };
         }
         catch (Exception ex)
@@ -427,7 +442,7 @@ public class GitService : IGitService
             {
                 Success = false,
                 ErrorCode = "NoSolutionOrProject",
-                ErrorMessage = "No `.sln` or `.csproj` found in the repository. Provide a C# solution/project repo or specify a path to the `.sln`."
+                ErrorMessage = $"Error scanning repository for C# projects: {ex.Message}"
             };
         }
     }
@@ -475,6 +490,77 @@ public class GitService : IGitService
         {
             _logger.LogError(ex, "Error getting commit hash for repository: {RepoPath}", repoPath);
             return null;
+        }
+    }
+
+    private string DetectRepositoryType(string repoPath)
+    {
+        try
+        {
+            // Check for various project types by looking for characteristic files
+            var allFiles = Directory.GetFiles(repoPath, "*", SearchOption.AllDirectories)
+                .Select(f => Path.GetFileName(f).ToLowerInvariant())
+                .ToList();
+            
+            var extensions = Directory.GetFiles(repoPath, "*", SearchOption.AllDirectories)
+                .Select(f => Path.GetExtension(f).ToLowerInvariant())
+                .Where(ext => !string.IsNullOrEmpty(ext))
+                .ToHashSet();
+
+            // TypeScript/JavaScript detection
+            if (allFiles.Contains("package.json") || allFiles.Contains("tsconfig.json") || 
+                extensions.Contains(".ts") || extensions.Contains(".js") || extensions.Contains(".tsx") || extensions.Contains(".jsx"))
+            {
+                return "TypeScript/JavaScript";
+            }
+
+            // Python detection
+            if (allFiles.Contains("requirements.txt") || allFiles.Contains("setup.py") || allFiles.Contains("pyproject.toml") ||
+                extensions.Contains(".py"))
+            {
+                return "Python";
+            }
+
+            // Java detection
+            if (allFiles.Contains("pom.xml") || allFiles.Contains("build.gradle") || extensions.Contains(".java"))
+            {
+                return "Java";
+            }
+
+            // Go detection
+            if (allFiles.Contains("go.mod") || allFiles.Contains("go.sum") || extensions.Contains(".go"))
+            {
+                return "Go";
+            }
+
+            // Rust detection
+            if (allFiles.Contains("cargo.toml") || extensions.Contains(".rs"))
+            {
+                return "Rust";
+            }
+
+            // C++ detection
+            if (allFiles.Contains("cmakelists.txt") || allFiles.Contains("makefile") || 
+                extensions.Contains(".cpp") || extensions.Contains(".cc") || extensions.Contains(".cxx") || extensions.Contains(".h") || extensions.Contains(".hpp"))
+            {
+                return "C++";
+            }
+
+            // Documentation repository detection
+            var codeExtensions = new[] { ".cs", ".ts", ".js", ".py", ".java", ".go", ".rs", ".cpp", ".c", ".h" };
+            var hasCodeFiles = extensions.Any(ext => codeExtensions.Contains(ext));
+            
+            if (!hasCodeFiles && (extensions.Contains(".md") || extensions.Contains(".txt") || extensions.Contains(".rst")))
+            {
+                return "Documentation";
+            }
+
+            return "Unknown";
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Error detecting repository type for {RepoPath}", repoPath);
+            return "Unknown";
         }
     }
 }

@@ -1,0 +1,136 @@
+<!-- Explorer View -->
+<div class="explorer-container h-100">
+  <!-- Toolbar -->
+  <div class="toolbar">
+    <!-- Left Section: URL, Branch, Analyze -->
+    <div class="toolbar-left">
+      <!-- Git URL Input -->
+      <div class="input-group url-input">
+        <span class="input-group-text">
+          <span class="material-icons">link</span>
+        </span>
+        <input type="text" class="form-control" placeholder="Git Repository URL" 
+               [(ngModel)]="repoUrl">
+      </div>
+
+      <!-- Branch Input -->
+      <div class="input-group branch-input">
+        <span class="input-group-text">
+          <span class="material-icons">fork_right</span>
+        </span>
+        <input type="text" class="form-control" placeholder="Branch (optional)" 
+               [(ngModel)]="branch">
+      </div>
+
+      <!-- Analyze Button -->
+      <button type="button" class="btn btn-primary analyze-btn" 
+              (click)="analyze()" [disabled]="isAnalyzing">
+        <span class="material-icons me-1">analytics</span>
+        {{ isAnalyzing ? 'Analyzing...' : 'Analyze' }}
+      </button>
+    </div>
+
+    <!-- Center Section: Scope Toggle, Search -->
+    <div class="toolbar-center">
+      <!-- Scope Toggle -->
+      <div class="btn-group" role="group">
+        <input type="radio" class="btn-check" name="scope" id="namespace-scope" 
+               value="namespace" [checked]="currentScope === 'namespace'"
+               (change)="onScopeChange('namespace')">
+        <label class="btn btn-outline-secondary" for="namespace-scope">
+          <span class="material-icons me-1">account_tree</span>
+          Namespace
+        </label>
+        
+        <input type="radio" class="btn-check" name="scope" id="file-scope" 
+               value="file" [checked]="currentScope === 'file'"
+               (change)="onScopeChange('file')">
+        <label class="btn btn-outline-secondary" for="file-scope">
+          <span class="material-icons me-1">description</span>
+          File
+        </label>
+      </div>
+
+      <!-- Search -->
+      <div class="input-group search-input">
+        <span class="input-group-text">
+          <span class="material-icons">search</span>
+        </span>
+        <input type="text" class="form-control" placeholder="Search nodes..." 
+               [value]="searchTerm" (input)="onSearchChange(($any($event.target)).value)">
+      </div>
+    </div>
+
+    <!-- Right Section: Export, Save/Load -->
+    <div class="toolbar-right">
+      <!-- Export Dropdown -->
+      <div class="dropdown">
+        <button class="btn btn-outline-secondary dropdown-toggle" 
+                type="button" data-bs-toggle="dropdown">
+          <span class="material-icons me-1">file_download</span>
+          Export
+        </button>
+        <ul class="dropdown-menu">
+          <li><a class="dropdown-item" href="#" (click)="exportPNG()">
+            <span class="material-icons me-2">image</span>PNG
+          </a></li>
+          <li><a class="dropdown-item" href="#" (click)="exportSVG()">
+            <span class="material-icons me-2">vector_graphic</span>SVG
+          </a></li>
+          <li><a class="dropdown-item" href="#" (click)="exportJSON()">
+            <span class="material-icons me-2">code</span>JSON
+          </a></li>
+        </ul>
+      </div>
+
+      <!-- Save/Load -->
+      <div class="btn-group">
+        <button type="button" class="btn btn-outline-secondary" 
+                (click)="save()">
+          <span class="material-icons me-1">save</span>
+          Save
+        </button>
+        <button type="button" class="btn btn-outline-secondary" 
+                (click)="load()">
+          <span class="material-icons me-1">folder_open</span>
+          Load
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Error Display -->
+  <div class="error-alert alert alert-danger alert-dismissible fade show" 
+       *ngIf="error" role="alert">
+    <span class="material-icons me-2">error</span>
+    {{ error }}
+    <button type="button" class="btn-close" (click)="clearError()"></button>
+  </div>
+
+  <!-- Main Content Area -->
+  <div class="main-area d-flex h-100">
+    <!-- Placeholder for future graph canvas -->
+    <div class="graph-area flex-grow-1 d-flex align-items-center justify-content-center">
+      <div class="placeholder-content" *ngIf="!analysisResult && !isAnalyzing">
+        <span class="material-icons">hub</span>
+        <h4>Enter a Git repository URL and click Analyze to get started</h4>
+        <p>CodeAtlas will analyze the C# codebase and show dependency graphs</p>
+      </div>
+      
+      <div class="loading-content" *ngIf="isAnalyzing">
+        <div class="spinner-border text-primary" role="status">
+          <span class="visually-hidden">Analyzing...</span>
+        </div>
+        <h5>Analyzing repository...</h5>
+        <p>This may take a few minutes for large repositories</p>
+      </div>
+
+      <div class="analysis-result" *ngIf="analysisResult && !isAnalyzing">
+        <h5>Analysis Complete!</h5>
+        <p>{{ currentScope === 'namespace' ? analysisResult.graphs.namespace.nodes.length : analysisResult.graphs.file.nodes.length }} nodes, 
+           {{ currentScope === 'namespace' ? analysisResult.graphs.namespace.edges.length : analysisResult.graphs.file.edges.length }} edges</p>
+        <small>Graph visualization will be implemented in Step 13</small>
+      </div>
+    </div>
+  </div>
+</div>

@@ -314,11 +314,38 @@ app.MapPost("/analyze", async (AnalyzeRequest request, IGitService gitService, I
     catch (InvalidOperationException ex) when (ex.Message.Contains("Could not clone"))
     {
         logger.LogError(ex, "Failed to clone repository: {RepoUrl}", request.RepoUrl);
+        
+        // Extract the actual git error from the exception message
+        var gitError = ex.Message.Replace("Could not clone the repository. Ensure the URL is public and reachable. Details: ", "");
+        
+        // Provide specific error messages based on common git clone failures
+        string specificMessage;
+        if (gitError.Contains("Repository not found") || gitError.Contains("not found"))
+        {
+            specificMessage = $"Repository '{request.RepoUrl}' does not exist or is not publicly accessible.";
+        }
+        else if (gitError.Contains("Permission denied") || gitError.Contains("authentication"))
+        {
+            specificMessage = $"Access denied to repository '{request.RepoUrl}'. Private repositories are not supported.";
+        }
+        else if (gitError.Contains("timeout") || gitError.Contains("timed out"))
+        {
+            specificMessage = $"Connection timeout while cloning '{request.RepoUrl}'. Please try again later.";
+        }
+        else if (gitError.Contains("network") || gitError.Contains("connection"))
+        {
+            specificMessage = $"Network error while accessing '{request.RepoUrl}'. Check your internet connection.";
+        }
+        else
+        {
+            specificMessage = $"Failed to clone '{request.RepoUrl}': {gitError.Trim()}";
+        }
+        
         return Results.Json(
             new ErrorResponse 
             { 
                 Code = "CloneFailed", 
-                Message = "Could not clone the repository. Ensure the URL is public and reachable." 
+                Message = specificMessage
             }, 
             statusCode: 502);
     }

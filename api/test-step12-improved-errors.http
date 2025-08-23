@@ -1,0 +1,155 @@
+### Step 12 Improved Error Messages - Testing Specific Error Scenarios
+
+### IMPROVED ERROR HANDLING:
+# - CloneFailed: Now provides specific reasons (repo not found, access denied, timeout, network issues)
+# - NoSolutionOrProject: Now detects repository type and explains what was found
+# - More actionable error messages with specific repository URLs and detected content
+
+### Test 1: Invalid Repository (Repository Not Found)
+POST http://localhost:5000/analyze
+Content-Type: application/json
+
+{
+  "repoUrl": "https://github.com/nonexistent/invalid-repo.git"
+}
+
+### Expected Result:
+# HTTP 502 Bad Gateway
+# {
+#   "error": "CloneFailed",
+#   "message": "Repository 'https://github.com/nonexistent/invalid-repo.git' does not exist or is not publicly accessible."
+# }
+
+### Test 2: TypeScript Repository (microsoft/TypeScript)
+POST http://localhost:5000/analyze
+Content-Type: application/json
+
+{
+  "repoUrl": "https://github.com/microsoft/TypeScript.git"
+}
+
+### Expected Result:
+# HTTP 400 Bad Request
+# {
+#   "error": "NoSolutionOrProject", 
+#   "message": "This appears to be a TypeScript/JavaScript repository (found package.json, tsconfig.json, or .js/.ts files). CodeAtlas only analyzes C# repositories with .sln or .csproj files."
+# }
+
+### Test 3: Python Repository
+POST http://localhost:5000/analyze
+Content-Type: application/json
+
+{
+  "repoUrl": "https://github.com/python/cpython.git"
+}
+
+### Expected Result:
+# HTTP 400 Bad Request
+# {
+#   "error": "NoSolutionOrProject",
+#   "message": "This appears to be a Python repository (found .py files or requirements.txt). CodeAtlas only analyzes C# repositories with .sln or .csproj files."
+# }
+
+### Test 4: Java Repository
+POST http://localhost:5000/analyze
+Content-Type: application/json
+
+{
+  "repoUrl": "https://github.com/openjdk/jdk.git"
+}
+
+### Expected Result:
+# HTTP 400 Bad Request
+# {
+#   "error": "NoSolutionOrProject",
+#   "message": "This appears to be a Java repository (found .java files or pom.xml). CodeAtlas only analyzes C# repositories with .sln or .csproj files."
+# }
+
+### Test 5: Go Repository
+POST http://localhost:5000/analyze
+Content-Type: application/json
+
+{
+  "repoUrl": "https://github.com/golang/go.git"
+}
+
+### Expected Result:
+# HTTP 400 Bad Request
+# {
+#   "error": "NoSolutionOrProject",
+#   "message": "This appears to be a Go repository (found .go files or go.mod). CodeAtlas only analyzes C# repositories with .sln or .csproj files."
+# }
+
+### Test 6: Rust Repository
+POST http://localhost:5000/analyze
+Content-Type: application/json
+
+{
+  "repoUrl": "https://github.com/rust-lang/rust.git"
+}
+
+### Expected Result:
+# HTTP 400 Bad Request
+# {
+#   "error": "NoSolutionOrProject",
+#   "message": "This appears to be a Rust repository (found .rs files or Cargo.toml). CodeAtlas only analyzes C# repositories with .sln or .csproj files."
+# }
+
+### Test 7: Documentation Repository
+POST http://localhost:5000/analyze
+Content-Type: application/json
+
+{
+  "repoUrl": "https://github.com/github/docs.git"
+}
+
+### Expected Result:
+# HTTP 400 Bad Request
+# {
+#   "error": "NoSolutionOrProject",
+#   "message": "This appears to be a documentation repository (found only .md, .txt, or config files). CodeAtlas requires C# repositories with .sln or .csproj files."
+# }
+
+### Test 8: Valid C# Repository (Should Still Work)
+POST http://localhost:5000/analyze
+Content-Type: application/json
+
+{
+  "repoUrl": "https://github.com/nunit/nunit.git"
+}
+
+### Expected Result:
+# HTTP 200 OK
+# Complete analysis payload with graphs, metrics, and cycles
+
+### Test 9: Private Repository (Access Denied)
+POST http://localhost:5000/analyze
+Content-Type: application/json
+
+{
+  "repoUrl": "https://github.com/microsoft/private-repo.git"
+}
+
+### Expected Result:
+# HTTP 502 Bad Gateway
+# {
+#   "error": "CloneFailed",
+#   "message": "Access denied to repository 'https://github.com/microsoft/private-repo.git'. Private repositories are not supported."
+# }
+
+### COMPARISON - Before vs After:
+
+### BEFORE (Generic):
+# CloneFailed: "Could not clone the repository. Ensure the URL is public and reachable."
+# NoSolutionOrProject: "No `.sln` or `.csproj` found in the repository. Provide a C# solution/project repo or specify a path to the `.sln`."
+
+### AFTER (Specific):
+# CloneFailed: "Repository 'https://github.com/nonexistent/invalid-repo.git' does not exist or is not publicly accessible."
+# NoSolutionOrProject: "This appears to be a TypeScript/JavaScript repository (found package.json, tsconfig.json, or .js/.ts files). CodeAtlas only analyzes C# repositories with .sln or .csproj files."
+
+### KEY IMPROVEMENTS:
+# 1. **Repository Detection**: Automatically detects TypeScript, Python, Java, Go, Rust, C++, and documentation repositories
+# 2. **Specific Clone Errors**: Distinguishes between "not found", "access denied", "timeout", and "network" issues
+# 3. **Actionable Messages**: Tells users exactly what type of repository they tried to analyze
+# 4. **URL Context**: Includes the specific repository URL in error messages for clarity
+# 5. **Educational**: Explains what CodeAtlas requires (C# repositories with .sln/.csproj files)
