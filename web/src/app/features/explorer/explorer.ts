@@ -5,10 +5,13 @@ import { Subject, takeUntil } from 'rxjs';
 import { ApiService, AnalysisResult, ApiError } from '../../core/api.service';
 import { StateService, AppState, Scope } from '../../core/state.service';
 import { ToasterService } from '../../core/toaster.service';
+import { GraphCanvasComponent, SelectedNodeInfo, FilterState } from '../../shared/graph-canvas/graph-canvas.component';
+import { NodeDetailsDrawerComponent } from '../../shared/node-details-drawer/node-details-drawer.component';
+import { FilterTreeComponent } from '../../shared/filter-tree/filter-tree.component';
 
 @Component({
   selector: 'app-explorer',
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, GraphCanvasComponent, NodeDetailsDrawerComponent, FilterTreeComponent],
   templateUrl: './explorer.html',
   styleUrl: './explorer.css'
 })
@@ -18,6 +21,15 @@ export class Explorer implements OnInit, OnDestroy {
   
   // State from StateService
   currentState: AppState;
+  
+  // Graph interaction state
+  selectedNode: SelectedNodeInfo | null = null;
+  filterState: FilterState = {
+    hiddenNodes: new Set(),
+    searchHighlights: new Set(),
+    neighborsOnly: false,
+    selectedNodeId: null
+  };
   
   private destroy$ = new Subject<void>();
 
@@ -174,5 +186,49 @@ export class Explorer implements OnInit, OnDestroy {
       }
     };
     input.click();
+  }
+
+  // Graph interaction methods
+  onNodeSelected(nodeInfo: SelectedNodeInfo | null): void {
+    this.selectedNode = nodeInfo;
+  }
+
+  onFilterStateChanged(newFilterState: FilterState): void {
+    this.filterState = newFilterState;
+  }
+
+  onNodesVisibilityChanged(hiddenNodes: Set<string>): void {
+    this.filterState = { 
+      ...this.filterState, 
+      hiddenNodes 
+    };
+  }
+
+  onCloseDrawer(): void {
+    this.selectedNode = null;
+    this.filterState = { 
+      ...this.filterState, 
+      selectedNodeId: null,
+      neighborsOnly: false
+    };
+  }
+
+  onImpactRequested(nodeId: string): void {
+    console.log('Impact analysis requested for:', nodeId);
+    // Will be implemented in Step 14
+    alert(`Impact analysis for ${nodeId} will be implemented in Step 14`);
+  }
+
+  onPathsRequested(nodeId: string): void {
+    console.log('Path analysis requested for:', nodeId);
+    // Will be implemented in Step 14
+    alert(`Path analysis for ${nodeId} will be implemented in Step 14`);
+  }
+
+  toggleNeighborsOnly(): void {
+    this.filterState = {
+      ...this.filterState,
+      neighborsOnly: !this.filterState.neighborsOnly
+    };
   }
 }

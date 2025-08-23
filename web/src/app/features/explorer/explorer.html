@@ -59,6 +59,18 @@
         <input type="text" class="form-control" placeholder="Search nodes..." 
                [value]="searchTerm" (input)="onSearchChange(($any($event.target)).value)">
       </div>
+
+      <!-- Neighbors Only Toggle -->
+      <div class="form-check form-switch neighbors-toggle" *ngIf="selectedNode">
+        <input class="form-check-input" type="checkbox" 
+               [checked]="filterState.neighborsOnly"
+               (change)="toggleNeighborsOnly()"
+               id="neighborsOnlySwitch">
+        <label class="form-check-label" for="neighborsOnlySwitch">
+          <span class="material-icons me-1">hub</span>
+          Neighbors Only
+        </label>
+      </div>
     </div>
 
     <!-- Right Section: Export, Save/Load -->
@@ -109,14 +121,26 @@
 
   <!-- Main Content Area -->
   <div class="main-area d-flex h-100">
-    <!-- Placeholder for future graph canvas -->
+    <!-- Left Filter Tree -->
+    <div class="filter-tree-panel" *ngIf="analysisResult && !isAnalyzing">
+      <app-filter-tree
+        [analysisResult]="analysisResult"
+        [currentScope]="currentScope"
+        [hiddenNodes]="filterState.hiddenNodes"
+        (nodesVisibilityChanged)="onNodesVisibilityChanged($event)">
+      </app-filter-tree>
+    </div>
+
+    <!-- Graph Canvas Area -->
     <div class="graph-area flex-grow-1 d-flex align-items-center justify-content-center">
+      <!-- Placeholder for no analysis -->
       <div class="placeholder-content" *ngIf="!analysisResult && !isAnalyzing">
         <span class="material-icons">hub</span>
         <h4>Enter a Git repository URL and click Analyze to get started</h4>
         <p>CodeAtlas will analyze the C# codebase and show dependency graphs</p>
       </div>
       
+      <!-- Loading state -->
       <div class="loading-content" *ngIf="isAnalyzing">
         <div class="spinner-border text-primary" role="status">
           <span class="visually-hidden">Analyzing...</span>
@@ -125,12 +149,24 @@
         <p>This may take a few minutes for large repositories</p>
       </div>
 
-      <div class="analysis-result" *ngIf="analysisResult && !isAnalyzing">
-        <h5>Analysis Complete!</h5>
-        <p>{{ currentScope === 'namespace' ? analysisResult.graphs.namespace.nodes.length : analysisResult.graphs.file.nodes.length }} nodes, 
-           {{ currentScope === 'namespace' ? analysisResult.graphs.namespace.edges.length : analysisResult.graphs.file.edges.length }} edges</p>
-        <small>Graph visualization will be implemented in Step 13</small>
-      </div>
+      <!-- Graph Canvas -->
+      <app-graph-canvas
+        *ngIf="analysisResult && !isAnalyzing"
+        [analysisResult]="analysisResult"
+        [currentScope]="currentScope"
+        [searchTerm]="searchTerm"
+        [filterState]="filterState"
+        (nodeSelected)="onNodeSelected($event)"
+        (filterStateChanged)="onFilterStateChanged($event)">
+      </app-graph-canvas>
     </div>
   </div>
+
+  <!-- Right Drawer -->
+  <app-node-details-drawer
+    [selectedNode]="selectedNode"
+    (closeRequested)="onCloseDrawer()"
+    (impactRequested)="onImpactRequested($event)"
+    (pathsRequested)="onPathsRequested($event)">
+  </app-node-details-drawer>
 </div>

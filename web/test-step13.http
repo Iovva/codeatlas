@@ -1,0 +1,328 @@
+###
+### Step 13: Graph Canvas + Selection Drawer + Filter Tree + Search + Neighbors-Only
+### 
+### This file contains comprehensive test scenarios to validate all Step 13 features.
+### Run these tests after starting both the backend API (port 5000) and frontend (port 4200).
+###
+### WHAT'S NEW IN STEP 13:
+### 1. Interactive Cytoscape.js graph visualization with ELK layout
+### 2. Right drawer for node selection showing canonical ID, LOC, fan-in/out metrics
+### 3. Left filter tree for namespace/folder hierarchy with toggle functionality
+### 4. Search functionality with case-insensitive substring match and highlighting
+### 5. Neighbors-only mode to show selected node + immediate neighbors
+### 6. Debounced re-layout system (150-200ms) for smooth filter changes
+### 7. Professional dark theme graph styling with node selection states
+### 8. Responsive design supporting desktop, tablet, and mobile devices
+###
+
+### BACKEND VALIDATION TESTS
+### These tests ensure the backend is ready to provide data for the frontend graph visualization
+
+### Test 1: Analyze a C# repository with clear namespace structure
+POST http://localhost:5000/analyze
+Content-Type: application/json
+
+{
+  "repoUrl": "https://github.com/nunit/nunit.git"
+}
+
+### Expected Result:
+### - HTTP 200 OK with complete analysis payload
+### - Should return ~9 namespace nodes and ~90 file nodes
+### - Multiple namespace dependencies showing architectural structure
+### - Several cycles detected (size >= 2) demonstrating circular dependencies
+### - Complete meta section with repo, commit, and timestamp information
+
+###
+
+### Test 2: Analyze a larger repository to test performance and complexity
+POST http://localhost:5000/analyze
+Content-Type: application/json
+
+{
+  "repoUrl": "https://github.com/AutoMapper/AutoMapper.git"
+}
+
+### Expected Result:
+### - HTTP 200 OK with substantial analysis data
+### - Should demonstrate complex dependency patterns
+### - Multiple cycles of varying sizes (2-34 files in AutoMapper case)
+### - High fan-in/fan-out metrics showing architectural hotspots
+### - Namespace aggregation reducing file complexity to manageable namespace view
+
+###
+
+### Test 3: Repository with clear folder structure for file scope testing
+POST http://localhost:5000/analyze
+Content-Type: application/json
+
+{
+  "repoUrl": "https://github.com/dotnet/samples.git"
+}
+
+### Expected Result:
+### - HTTP 200 OK with diverse file structure
+### - Clear folder hierarchy for filter tree demonstration
+### - Multiple projects showing different architectural patterns
+### - Good balance of namespace and file scope complexity
+
+###
+
+### FRONTEND VALIDATION TESTS
+### These tests validate the interactive graph visualization features
+### Open http://localhost:4200 in your browser and perform these manual tests:
+
+###
+### GRAPH CANVAS VALIDATION
+###
+
+### Test 4: Basic Graph Rendering
+### Steps:
+### 1. Enter "https://github.com/nunit/nunit.git" in the Git URL field
+### 2. Click "Analyze" button
+### 3. Wait for "Analyzing..." state to complete
+### 4. Observe graph canvas renders with Cytoscape visualization
+###
+### Expected Results:
+### ✅ Graph canvas displays with dark theme styling
+### ✅ Namespace scope shows ~9 nodes with clear layout (ELK hierarchical)
+### ✅ File scope shows ~90 nodes arranged in logical hierarchy
+### ✅ Nodes have proper labels and professional styling
+### ✅ Edges show dependency relationships with arrow indicators
+### ✅ Graph is interactive (pan, zoom, node selection)
+
+###
+### NODE SELECTION & RIGHT DRAWER VALIDATION
+###
+
+### Test 5: Node Selection and Details Drawer
+### Steps:
+### 1. With analysis complete, click on any node in the graph
+### 2. Observe right drawer slides in from right edge
+### 3. Examine node details displayed in drawer
+### 4. Click on empty canvas area to deselect
+###
+### Expected Results:
+### ✅ Right drawer appears with smooth slide-in animation
+### ✅ Drawer shows canonical ID (e.g., "Namespace:NUnit.Framework")
+### ✅ Display name shows short form (e.g., "Framework")
+### ✅ LOC (Lines of Code) metric displayed with proper formatting
+### ✅ Fan-In metric shows incoming dependency count
+### ✅ Fan-Out metric shows outgoing dependency count
+### ✅ Clicking empty canvas closes drawer smoothly
+### ✅ Drawer is hidden by default when nothing selected
+
+###
+### FILTER TREE VALIDATION
+###
+
+### Test 6: Left Filter Tree - Namespace Scope
+### Steps:
+### 1. Ensure analysis is complete and namespace scope is selected
+### 2. Observe left filter tree panel showing namespace hierarchy
+### 3. Click expand/collapse buttons on tree nodes
+### 4. Uncheck some namespace checkboxes
+### 5. Observe corresponding nodes disappear from graph
+### 6. Re-check the checkboxes
+###
+### Expected Results:
+### ✅ Filter tree shows hierarchical namespace structure
+### ✅ Tree nodes display with proper indentation and icons
+### ✅ Expand/collapse buttons work correctly
+### ✅ Unchecking namespace hides corresponding graph nodes
+### ✅ Re-checking namespace shows nodes again
+### ✅ Tree shows node count statistics (e.g., "8 of 9 visible")
+### ✅ Expand All/Collapse All buttons work properly
+
+### Test 7: Left Filter Tree - File Scope  
+### Steps:
+### 1. Switch to "File" scope using radio buttons in toolbar
+### 2. Observe filter tree changes to folder hierarchy
+### 3. Expand/collapse folder nodes
+### 4. Uncheck some folder checkboxes
+### 5. Observe file nodes disappear from graph
+###
+### Expected Results:
+### ✅ Filter tree switches to folder-based hierarchy
+### ✅ Shows file structure with folders and individual files
+### ✅ Folder icons vs file icons displayed correctly
+### ✅ Unchecking folders hides all contained files
+### ✅ Indeterminate state works for partially selected folders
+### ✅ Individual file selection works correctly
+
+###
+### SEARCH FUNCTIONALITY VALIDATION
+###
+
+### Test 8: Search with Highlighting
+### Steps:
+### 1. With analysis complete, type "Framework" in search box
+### 2. Observe matching nodes get highlighted
+### 3. Clear search and try "Test" or "Assert"
+### 4. Try partial matches and case variations
+###
+### Expected Results:
+### ✅ Search highlights matching nodes with distinct color (gold/yellow)
+### ✅ Case-insensitive matching works correctly
+### ✅ Substring matching works (partial node names)
+### ✅ Clearing search removes all highlights
+### ✅ Search works on both canonical ID and display name
+### ✅ Multiple nodes can be highlighted simultaneously
+### ✅ Highlighted nodes remain visible regardless of filter state
+
+###
+### NEIGHBORS-ONLY MODE VALIDATION
+###
+
+### Test 9: Neighbors-Only Mode
+### Steps:
+### 1. Click on a node with several connections (high fan-in/out)
+### 2. Observe "Neighbors Only" toggle appears in toolbar
+### 3. Enable the "Neighbors Only" toggle
+### 4. Observe graph shows only selected node + immediate neighbors
+### 5. Select a different node while neighbors-only is enabled
+### 6. Disable neighbors-only mode
+###
+### Expected Results:
+### ✅ "Neighbors Only" toggle only appears when node is selected
+### ✅ Enabling toggle hides all nodes except selected + neighbors
+### ✅ Only edges between visible nodes are shown
+### ✅ Selecting different node updates the neighbor set
+### ✅ Disabling toggle shows all nodes again (respecting other filters)
+### ✅ Toggle state is properly managed with node selection
+
+###
+### DEBOUNCED LAYOUT VALIDATION
+###
+
+### Test 10: Smooth Layout Updates
+### Steps:
+### 1. With analysis complete, rapidly toggle several filter tree checkboxes
+### 2. Observe layout updates are smooth and not jerky
+### 3. Enable/disable multiple filters quickly
+### 4. Switch between namespace/file scope rapidly
+###
+### Expected Results:
+### ✅ Layout updates are debounced (150-200ms delay)
+### ✅ No jerky or excessive re-layout during rapid filter changes
+### ✅ Final layout is stable and well-organized
+### ✅ Performance remains smooth with complex graphs
+### ✅ ELK layout algorithm produces hierarchical, readable results
+
+###
+### SCOPE SWITCHING VALIDATION
+###
+
+### Test 11: Namespace vs File Scope
+### Steps:
+### 1. Start with namespace scope selected
+### 2. Select a namespace node and observe drawer details
+### 3. Switch to file scope using radio button
+### 4. Observe graph changes to file-level view
+### 5. Select a file node and compare drawer details
+### 6. Switch back to namespace scope
+###
+### Expected Results:
+### ✅ Scope toggle works correctly with radio button interface
+### ✅ Graph re-renders with appropriate node set (namespace vs file)
+### ✅ Filter tree updates to match current scope
+### ✅ Node selection is cleared when switching scopes
+### ✅ Drawer shows appropriate metrics for each scope
+### ✅ Search and filters reset appropriately for new scope
+
+###
+### RESPONSIVE DESIGN VALIDATION
+###
+
+### Test 12: Mobile and Tablet Responsiveness
+### Steps:
+### 1. Open browser developer tools
+### 2. Switch to mobile device simulation (iPhone/Android)
+### 3. Perform analysis and interact with graph
+### 4. Switch to tablet simulation (iPad)
+### 5. Test all major interactions on different screen sizes
+###
+### Expected Results:
+### ✅ Toolbar adapts to mobile layout (stacked elements)
+### ✅ Filter tree panel adjusts for smaller screens
+### ✅ Right drawer takes full width on mobile
+### ✅ Graph canvas remains interactive on touch devices
+### ✅ All buttons are touch-friendly (minimum 44px targets)
+### ✅ Text remains readable at all screen sizes
+
+###
+### ERROR HANDLING VALIDATION
+###
+
+### Test 13: Empty States and Error Conditions
+### Steps:
+### 1. Start with no analysis data (fresh page load)
+### 2. Observe placeholder content in graph area
+### 3. Try analyzing an invalid repository URL
+### 4. Try a repository with no cycles
+### 5. Test with very small repository (few nodes)
+###
+### Expected Results:
+### ✅ Placeholder content shows helpful getting started message
+### ✅ Loading state displays during analysis with spinner
+### ✅ Error states are handled gracefully (modal for repo errors)
+### ✅ Empty filter tree states show appropriate messages
+### ✅ Small graphs still render correctly with proper layout
+
+###
+### PERFORMANCE VALIDATION
+###
+
+### Test 14: Performance with Complex Graphs
+### Steps:
+### 1. Analyze a complex repository (AutoMapper or AspNetCore)
+### 2. Measure initial render time (should be ≤ 2 seconds)
+### 3. Test filter operations responsiveness (should be ≤ 200ms)
+### 4. Test scope switching performance
+### 5. Test search performance with large node sets
+###
+### Expected Results:
+### ✅ Initial graph render completes within 2 seconds
+### ✅ Filter operations respond within 200ms
+### ✅ Search highlighting updates immediately
+### ✅ Layout updates are smooth and not blocking
+### ✅ Memory usage remains stable during interactions
+### ✅ No memory leaks from Cytoscape instance
+
+###
+### INTEGRATION VALIDATION
+###
+
+### Test 15: Full Workflow Integration
+### Steps:
+### 1. Perform complete analysis workflow
+### 2. Switch between namespace and file scopes
+### 3. Use filter tree to hide/show different sections
+### 4. Search for specific nodes and select them
+### 5. Use neighbors-only mode for focused exploration
+### 6. Test drawer interactions and node details
+###
+### Expected Results:
+### ✅ All features work together seamlessly
+### ✅ State is properly managed across all interactions
+### ✅ No conflicts between different UI modes
+### ✅ User experience is intuitive and responsive
+### ✅ Professional appearance with consistent dark theme
+### ✅ All animations and transitions are smooth
+
+###
+### STEP 13 COMPLETION CRITERIA
+###
+### ✅ Cytoscape.js + ELK integration working with professional graph visualization
+### ✅ Right drawer shows node details (canonical ID, LOC, fan-in/out) on selection
+### ✅ Left filter tree provides namespace/folder hierarchy with toggle functionality
+### ✅ Search functionality highlights matching nodes with case-insensitive substring matching
+### ✅ Neighbors-only mode shows selected node + immediate neighbors when enabled
+### ✅ Debounced re-layout system (150-200ms) provides smooth filter change experience
+### ✅ Professional dark theme styling with proper node selection states
+### ✅ Responsive design works across desktop, tablet, and mobile devices
+### ✅ All interactions are smooth and performant (≤ 200ms response time)
+### ✅ Integration with existing API service and state management is seamless
+###
+### READY FOR STEP 14: Impact (Transitive Dependents) + Path A→B
+###

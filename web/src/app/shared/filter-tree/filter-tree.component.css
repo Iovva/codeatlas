@@ -1,0 +1,131 @@
+.filter-tree {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background-color: #2d3748;
+  border-right: 1px solid #4a5568;
+}
+
+.tree-header {
+  padding: 1rem;
+  background-color: #1a202c;
+  border-bottom: 1px solid #4a5568;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.tree-title {
+  color: #e2e8f0;
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+}
+
+.tree-title .material-icons {
+  font-size: 1.2rem;
+}
+
+.tree-actions {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.tree-actions .btn {
+  padding: 0.25rem 0.5rem;
+  border-color: #4a5568;
+  color: #a0aec0;
+}
+
+.tree-actions .btn:hover {
+  background-color: #4a5568;
+  border-color: #63b3ed;
+  color: #e2e8f0;
+}
+
+.tree-actions .material-icons {
+  font-size: 1rem;
+}
+
+.tree-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1rem 0;
+}
+
+.tree-stats {
+  padding: 0 1rem 0.5rem;
+  border-bottom: 1px solid #4a5568;
+  margin-bottom: 1rem;
+}
+
+.tree-stats small {
+  color: #718096;
+  font-size: 0.75rem;
+}
+
+.tree-nodes {
+  padding: 0 1rem;
+}
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  text-align: center;
+  color: #a0aec0;
+}
+
+.empty-state .material-icons {
+  font-size: 3rem;
+  color: #4a5568;
+  margin-bottom: 1rem;
+}
+
+.empty-state p {
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+/* Custom checkbox styling for dark theme */
+.form-check-input {
+  background-color: #2d3748;
+  border-color: #4a5568;
+}
+
+.form-check-input:checked {
+  background-color: #3182ce;
+  border-color: #3182ce;
+}
+
+.form-check-input:focus {
+  border-color: #63b3ed;
+  box-shadow: 0 0 0 0.2rem rgba(49, 130, 206, 0.25);
+}
+
+.form-check-input:indeterminate {
+  background-color: #d69e2e;
+  border-color: #d69e2e;
+}
+
+/* Scrollbar styling */
+.tree-content::-webkit-scrollbar {
+  width: 8px;
+}
+
+.tree-content::-webkit-scrollbar-track {
+  background: #1a202c;
+}
+
+.tree-content::-webkit-scrollbar-thumb {
+  background: #4a5568;
+  border-radius: 4px;
+}
+
+.tree-content::-webkit-scrollbar-thumb:hover {
+  background: #63b3ed;
+}

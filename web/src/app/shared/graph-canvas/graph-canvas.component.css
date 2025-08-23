@@ -1,0 +1,49 @@
+.graph-canvas-container {
+  position: relative;
+  background-color: #1a1a1a;
+  border: 1px solid #2d3748;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.cytoscape-container {
+  width: 100%;
+  height: 100%;
+  background-color: #1a1a1a;
+  cursor: grab;
+}
+
+.cytoscape-container:active {
+  cursor: grabbing;
+}
+
+/* Loading overlay */
+.loading-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(26, 26, 26, 0.8);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+}
+
+.loading-overlay .spinner-border {
+  width: 3rem;
+  height: 3rem;
+  margin-bottom: 1rem;
+}
+
+.loading-overlay h5 {
+  color: #e2e8f0;
+  margin-bottom: 0.5rem;
+}
+
+.loading-overlay p {
+  color: #a0aec0;
+  margin: 0;
+}

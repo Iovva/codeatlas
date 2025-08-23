@@ -9,6 +9,24 @@ export interface AnalyzeRequest {
   branch?: string;
 }
 
+export interface Node {
+  id: string;
+  label: string;
+  loc: number;
+  fanIn: number;
+  fanOut: number;
+}
+
+export interface Edge {
+  from: string;
+  to: string;
+}
+
+export interface GraphData {
+  nodes: Node[];
+  edges: Edge[];
+}
+
 export interface AnalysisResult {
   meta: {
     repo: string;
@@ -17,14 +35,8 @@ export interface AnalysisResult {
     generatedAt: string;
   };
   graphs: {
-    namespace: {
-      nodes: Array<{ id: string; label: string; loc: number; fanIn: number; fanOut: number; }>;
-      edges: Array<{ from: string; to: string; }>;
-    };
-    file: {
-      nodes: Array<{ id: string; label: string; loc: number; fanIn: number; fanOut: number; }>;
-      edges: Array<{ from: string; to: string; }>;
-    };
+    namespace: GraphData;
+    file: GraphData;
   };
   metrics: {
     counts: {
@@ -32,8 +44,8 @@ export interface AnalysisResult {
       fileNodes: number;
       edges: number;
     };
-    fanInTop: Array<{ id: string; label: string; loc: number; fanIn: number; fanOut: number; }>;
-    fanOutTop: Array<{ id: string; label: string; loc: number; fanIn: number; fanOut: number; }>;
+    fanInTop: Node[];
+    fanOutTop: Node[];
   };
   cycles: Array<{
     id: number;

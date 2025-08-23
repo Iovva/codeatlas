@@ -45,6 +45,30 @@
   max-width: 350px;
 }
 
+.neighbors-toggle {
+  display: flex;
+  align-items: center;
+  margin: 0;
+  white-space: nowrap;
+}
+
+.neighbors-toggle .form-check-input {
+  margin-right: 0.5rem;
+}
+
+.neighbors-toggle .form-check-label {
+  color: #e2e8f0;
+  font-size: 0.875rem;
+  display: flex;
+  align-items: center;
+  margin: 0;
+  cursor: pointer;
+}
+
+.neighbors-toggle .material-icons {
+  font-size: 1rem;
+}
+
 /* Toolbar Layout Groups */
 .toolbar-left {
   display: flex;
@@ -200,6 +224,16 @@
 .main-area {
   flex: 1;
   overflow: hidden;
+  gap: 0;
+}
+
+.filter-tree-panel {
+  width: 320px;
+  min-width: 280px;
+  max-width: 400px;
+  background-color: #2d3748;
+  border-right: 1px solid #4a5568;
+  flex-shrink: 0;
 }
 
 .graph-area {
@@ -208,6 +242,8 @@
   border-radius: 8px;
   margin: 1rem;
   position: relative;
+  flex: 1;
+  min-height: 0;
 }
 
 /* Placeholder States */
