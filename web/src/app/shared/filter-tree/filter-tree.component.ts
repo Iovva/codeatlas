@@ -412,11 +412,9 @@ export class FilterTreeComponent implements OnChanges {
         // First sync children
         this.syncCheckboxStatesFromHiddenNodes(node.children);
         
-        // For parent nodes, check if ALL children are unchecked
-        const allChildrenUnchecked = node.children.every(child => !child.isChecked);
-        
-        // Parent is checked if it's not explicitly hidden AND not all children are unchecked
-        node.isChecked = !this.hiddenNodes.has(node.id) && !allChildrenUnchecked;
+        // For parent nodes, they are checked if they are not explicitly hidden
+        // Parent remains checked (showing as indeterminate) even if all children are unchecked
+        node.isChecked = !this.hiddenNodes.has(node.id);
       } else {
         // Leaf node - checked if none of its node IDs are hidden
         const hasHiddenNodes = Array.from(node.nodeIds).some(id => this.hiddenNodes.has(id));
