@@ -484,15 +484,11 @@ export class FilterTreeComponent implements OnChanges {
       console.log(`🔧 Child node action - ${checked ? 'showing' : 'hiding'} only this node`);
       
       if (checked) {
-        // Checking child → show child + check if parent should be visible
+        // Checking child → show child + make all ancestor parents visible
         newHiddenNodes.delete(node.id);
         
-        // If parent exists and is unchecked, make parent visible too
-        const parent = this.findParentNode(node, this.rootNodes);
-        if (parent && newHiddenNodes.has(parent.id)) {
-          newHiddenNodes.delete(parent.id);
-          console.log(`🔧 Making parent ${parent.label} visible because child was checked`);
-        }
+        // Recursively make all ancestor parents visible
+        this.makeAllAncestorsVisible(node, newHiddenNodes);
       } else {
         // Unchecking child → hide only this child, never change parent
         newHiddenNodes.add(node.id);
@@ -548,6 +544,21 @@ export class FilterTreeComponent implements OnChanges {
     }
     
     return null;
+  }
+  
+  /**
+   * Makes all ancestor parents visible when a child is checked.
+   * This ensures the checked child can be seen in the hierarchy.
+   */
+  private makeAllAncestorsVisible(node: TreeNode, hiddenNodes: Set<string>): void {
+    const parent = this.findParentNode(node, this.rootNodes);
+    if (parent && hiddenNodes.has(parent.id)) {
+      hiddenNodes.delete(parent.id);
+      console.log(`🔧 Making ancestor ${parent.label} visible because descendant was checked`);
+      
+      // Recursively make grandparents visible too
+      this.makeAllAncestorsVisible(parent, hiddenNodes);
+    }
   }
   
   private getOwnNodeIds(node: TreeNode): string[] {
